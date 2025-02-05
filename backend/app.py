@@ -57,7 +57,7 @@ def brighten():
     enhanced_img = enhance_image(data['image'])
     
     # Convert the enhanced image to base64
-    enhanced_base64 = pil_to_base64(enhanced_img)
+    enhanced_base64 = numpy_to_base64(enhanced_img)
     
     # Return the enhanced image in the response
     return jsonify({'enhanced_image_url': f"data:image/png;base64,{enhanced_base64}"})
@@ -67,15 +67,39 @@ def enhance_image(image):
     Enhance the input image using the LIME algorithm.
     """
     # Initialize the LIME model
-    lime_model = LIME(iterations=30, alpha=0.15, rho=1.1, gamma=0.6, strategy=2, exact=True)
+    img_data = base64.b64decode(image.split(',')[1])
+    nparr = np.frombuffer(img_data, np.uint8)
+    img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    
+    # Convert the image to LAB color space
+    lab = cv2.cvtColor(img_np, cv2.COLOR_BGR2LAB)
 
-    # Apply LIME enhancement
-    lime_model.load(image, False)
+    # Split the LAB image into L, A, and B channels
+    l_channel, a_channel, b_channel = cv2.split(lab)
 
-    R = lime_model.run()
+    # Apply CLAHE to the L channel
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    l_channel_clahe = clahe.apply(l_channel)
 
-    enhanced_img_pil = Image.fromarray((R).astype('uint8'))
-    return enhanced_img_pil
+    # Merge the enhanced L channel with the original A and B channels
+    lab_clahe = cv2.merge((l_channel_clahe, a_channel, b_channel))
+
+    # Convert back to BGR color space (numpy)
+    enhanced_img = cv2.cvtColor(lab_clahe, cv2.COLOR_LAB2BGR)
+
+    return enhanced_img
+
+def numpy_to_base64(img):
+    """
+    Convert a NumPy array (OpenCV image) to a base64-encoded string.
+    """
+    # Encode the image into a byte buffer (PNG format)
+    _, buffer = cv2.imencode('.png', img)
+
+    # Convert the byte buffer to a base64 string
+    base64_str = base64.b64encode(buffer).decode('utf-8')
+
+    return base64_str
 
 def pil_to_base64(img):
     """
