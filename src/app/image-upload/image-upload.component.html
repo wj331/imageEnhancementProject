@@ -1,0 +1,76 @@
+<!-- Upload Image -->
+<nz-form-item>
+  <nz-form-label [nzFor]="'uploadImage'" nzRequired>Upload Image</nz-form-label>
+  <nz-form-control>
+    <input
+      type="file"
+      id="uploadImage"
+      (change)="onFileSelected($event)"
+      accept="image/*"
+      style="display: block"
+    />
+    <div *ngIf="imageError" class="error">{{ imageError }}</div>
+  </nz-form-control>
+</nz-form-item>
+
+<!-- Display Uploaded Image -->
+<nz-card *ngIf="uploadedImage" nzBordered [nzTitle]="'Uploaded Image'" style="margin-bottom: 20px;">
+<div style="position: relative;">
+  <img [src]="uploadedImage" alt="Original Image" style="max-width: 100%; border: 1px solid #ccc;" />
+  <div
+    *ngFor="let result of detectionResultsOriginal"
+    [ngStyle]="{
+      position: 'absolute',
+      border: '2px solid red',
+      top: result.y + 'px',
+      left: result.x + 'px',
+      width: result.width + 'px',
+      height: result.height + 'px'
+    }"
+  >
+    <nz-tag
+      [style]="{
+        backgroundColor: 'red',
+        color: 'red',
+        fontSize: '12px',
+        padding: '2px',
+        position: 'absolute',
+        top: '-20px'
+      }"
+    >
+      {{ result.label }} {{ result.confidence ? '(' + result.confidence.toFixed(2) + ')' : '' }}
+    </nz-tag>
+  </div>
+</div>
+</nz-card>
+
+<!-- Display Brightened Image -->
+<nz-card *ngIf="brightenedImage" nzBordered [nzTitle]="'Brightened Image'" style="margin-bottom: 20px;">
+  <div style="position: relative;">
+    <img [src]="brightenedImage" alt="Brightened Image" style="max-width: 100%; border: 1px solid #ccc;" />
+    <div
+      *ngFor="let result of detectionResultsBrightened"
+      [ngStyle]="{
+        position: 'absolute',
+        border: '2px solid red',
+        top: result.y + 'px',
+        left: result.x + 'px',
+        width: result.width + 'px',
+        height: result.height + 'px'
+      }"
+    >
+      <nz-tag
+        [style]="{
+          backgroundColor: 'red',
+          color: 'red',
+          fontSize: '12px',
+          padding: '2px',
+          position: 'absolute',
+          top: '-20px'
+        }"
+      >
+        {{ result.label }} {{ result.confidence ? '(' + result.confidence.toFixed(2) + ')' : '' }}
+      </nz-tag>
+    </div>
+  </div>
+  </nz-card>
