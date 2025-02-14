@@ -14,18 +14,18 @@
 </nz-form-item>
 
 <!-- Display Uploaded Image -->
-<nz-card *ngIf="uploadedImage" nzBordered [nzTitle]="'Uploaded Image'" style="margin-bottom: 20px;">
+<nz-card *ngIf="uploadedImagePath" nzBordered [nzTitle]="'Uploaded Image'" style="margin-bottom: 20px;">
 <div style="position: relative;">
-  <img [src]="uploadedImage" alt="Original Image" style="max-width: 100%; border: 1px solid #ccc;" />
+  <img [src]="uploadedImagePath" alt="Original Image" style="max-width: 100%; border: 1px solid #ccc;" (load)="onImageLoad($event)" />
   <div
     *ngFor="let result of detectionResultsOriginal"
     [ngStyle]="{
       position: 'absolute',
       border: '2px solid red',
-      top: result.y + 'px',
-      left: result.x + 'px',
-      width: result.width + 'px',
-      height: result.height + 'px'
+      top: (result.y * scaleY) + 'px',
+      left: (result.x * scaleX) + 'px',
+      width: (result.width * scaleX) + 'px',
+      height: (result.height * scaleY) + 'px'
     }"
   >
     <nz-tag
@@ -45,9 +45,9 @@
 </nz-card>
 
 <!-- Display Brightened Image -->
-<nz-card *ngIf="brightenedImage" nzBordered [nzTitle]="'Brightened Image'" style="margin-bottom: 20px;">
+<nz-card *ngIf="brightenedImagePath" nzBordered [nzTitle]="'Brightened Image'" style="margin-bottom: 20px;">
   <div style="position: relative;">
-    <img [src]="brightenedImage" alt="Brightened Image" style="max-width: 100%; border: 1px solid #ccc;" />
+    <img [src]="brightenedImagePath" alt="Brightened Image" style="max-width: 100%; border: 1px solid #ccc;" />
     <div
       *ngFor="let result of detectionResultsBrightened"
       [ngStyle]="{

@@ -42,3 +42,5 @@ testem.log
 Thumbs.db
 
 /Zero-DCE/Zero-DCE_code/snapshots
+
+/backend/uploads

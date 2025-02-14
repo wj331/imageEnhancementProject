@@ -18,13 +18,15 @@ import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
   styleUrls: ['./image-upload.component.css']
 })
 export class ImageUploadComponent {
-  uploadedImage: string | ArrayBuffer | null = null;
+  uploadedImagePath: string | null = null;
   imageError: string | null = null;
   detectionResultsOriginal: { x: number; y: number; width: number; height: number; label: string; confidence: number; }[] | null = null;
   detectionResultsBrightened: { x: number; y: number; width: number; height: number; label: string; confidence: number; }[] | null = null;
-  brightenedImage: string | ArrayBuffer | null = null;
+  brightenedImagePath: string | null = null;
   detectedImageUrl: string | null = null;
   backendUrl = 'http://localhost:5000/';
+  scaleX: number = 1;
+  scaleY: number = 1;
 
   constructor(private http: HttpClient) {}
 
@@ -34,27 +36,45 @@ export class ImageUploadComponent {
       if (file.type.startsWith('image/')) {
         const formData = new FormData();
         formData.append('image', file);
-  
-        const reader = new FileReader();
-        reader.onload = () => {
-          this.uploadedImage = reader.result as string; // Convert to string
-          console.log(this.uploadedImage);
-          this.performObjectDetection(this.uploadedImage, true); // Detect objects
-          this.brighten(this.uploadedImage); // Uncomment if needed
-        };
-  
-        reader.readAsDataURL(file); // Must call this to trigger 'onload'
+        // Send the file to the backend
+        this.http.post<{ filePath: string }>(
+          this.backendUrl + 'upload', 
+          formData
+        ).subscribe(
+          (response) => {
+            this.processFilePath(response, "normal");
+            console.log('File saved at:', this.uploadedImagePath);
+
+            if (this.uploadedImagePath) {
+              this.performObjectDetection(this.uploadedImagePath, true); // Pass the file path
+              this.brighten(this.uploadedImagePath);
+            } else {
+              console.error('Uploaded image path is null.');
+            }
+          },
+          (error) => {
+            console.error('Error uploading file:', error);
+            this.imageError = 'Failed to upload the image.';
+          }
+        );
       } else {
         this.imageError = 'Please upload a valid image file.';
         console.error(this.imageError);
       }
     }
   }
+
+  onImageLoad(event: Event) {
+    const image = event.target as HTMLImageElement;
+    this.scaleX = image.width / image.naturalWidth;
+    this.scaleY = image.height / image.naturalHeight;
+  }
   
   //To call YOLO
-  performObjectDetection(base64Image: string, isOriginal: boolean) {
-    const requestBody = { image: base64Image };
-    console.log("Sending image to detection API:", requestBody);
+  performObjectDetection(imagePath: string, isOriginal: boolean) {
+    const localFilePath = './backend/uploads/' + imagePath.split('/').pop();
+    const requestBody = { filePath: localFilePath };
+    console.log("Sending image path to detection API:", requestBody);
 
     this.http.post<{ detections: { x: number; y: number; width: number; height: number; label: string; confidence: number }[] }>(
       this.backendUrl + 'detect',
@@ -77,16 +97,23 @@ export class ImageUploadComponent {
     ).subscribe();
   }
 
-  brighten(base64Image: string) {
-    const requestBody = { image: base64Image }; //send as JSON payload
+  brighten(imagePath: string) {
+    const localFilePath = './backend/uploads/'  + imagePath.split('/').pop();
+    const requestBody = { filePath: localFilePath };
+    console.log("Sending image path to brighten API:", requestBody);
 
-    this.http.post<{ enhanced_image_url: string }>(
+    this.http.post<{ enhanced_image_path: string }>(
       this.backendUrl + 'brighten',
       requestBody
     ).pipe(
       tap((response) => {
-        this.brightenedImage = response.enhanced_image_url; // Ensure matches response from API
-        this.performObjectDetection(this.brightenedImage as string, false); // Call object detection API on enhanced image  
+        this.processFilePath(response, "brightened");
+        console.log("sending brightened image path to detection API: ,", this.brightenedImagePath);
+        if (this.brightenedImagePath) {
+          this.performObjectDetection(this.brightenedImagePath, false); // Call object detection API on enhanced image  
+        } else {
+          console.error('Brightened image path is null.');
+        }
       }),
       catchError((error) => {
         console.error('Image enhancement failed:', error);
@@ -94,6 +121,19 @@ export class ImageUploadComponent {
         return throwError(() => error); // Ensure the observable continues to propagate the error if needed
       })
     ).subscribe();
-    
   }
+
+  processFilePath(response: { enhanced_image_path?: string; filePath?: string }, variable: string) {
+    if (variable === "brightened") {
+      const currPath = response.enhanced_image_path;
+      if (currPath) {
+        this.brightenedImagePath = this.backendUrl + 'uploads/' + currPath.split('/').pop();
+      }
+    } else if (variable === "normal") {
+      const currPath = response.filePath;
+      if (currPath) {
+        this.uploadedImagePath = this.backendUrl + 'uploads/' + currPath.split('/').pop();
+      }
+    }
+  }  
 }

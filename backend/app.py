@@ -1,30 +1,56 @@
-from flask import Flask, request, jsonify, Response
+import uuid
+from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_socketio import SocketIO
-import cv2
 import numpy as np
 from flask_cors import CORS
-import torch
 from PIL import Image
-import io
 from ultralytics import YOLO
-import base64
-from LIME.LIME import LIME
+from .services.image_service import enhance_image, hdr_brightness
+from .utils.image_utils import numpy_to_base64
+import os
+import cv2
 
 app = Flask(__name__)
 CORS(app)  # Enable Cross-Origin Resource Sharing (CORS)
 
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+print(f"UPLOAD_FOLDER path: {os.path.abspath(UPLOAD_FOLDER)}")
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image file provided'}), 400
+    file = request.files['image']
+
+    if file and file.filename != '':
+        ext = os.path.splitext(file.filename)[1]
+        uniqueFileName = f"{uuid.uuid4()}{ext}"
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], uniqueFileName).replace('\\', '/')
+        file.save(file_path)
+        return jsonify({'filePath': file_path}), 200
+    else:
+        return jsonify({'error': 'No image file provided'}), 400
+    
+@app.route('/uploads/<filename>')
+def serve_uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 @app.route('/detect', methods=['POST'])
 def detect():
     data = request.get_json()
-    if not data or 'image' not in data:
-        return jsonify({'error': 'No image file provided'}), 400
+    if not data or 'filePath' not in data:
+        return jsonify({'error': 'No image filepath provided'}), 400
 
-    # Load image
-    base64_str = data['image'].split(',')[1]
-    img_bytes = base64.b64decode(base64_str)
-    img = Image.open(io.BytesIO(img_bytes))
+    file_path = data['filePath']
+    if not os.path.exists(file_path):
+        return jsonify({'error': 'Invalid image filepath provided'}), 400
+    img = Image.open(file_path)
 
-    model = YOLO('yolov8s.pt')
+    # model = YOLO(r"C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/uno.pt")
+    model = YOLO(r"C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/yolov8s.pt")
     # Perform inference
     results = model(img)
 
@@ -36,81 +62,52 @@ def detect():
                 box_data = box.data.cpu().numpy()
                 for row in box_data:
                     x_min, y_min, x_max, y_max, conf, cls = row
+                    x_min = max(0, min(img.width, int(x_min)))
+                    y_min = max(0, min(img.height, int(y_min)))
+                    x_max = max(0, min(img.width, int(x_max)))
+                    y_max = max(0, min(img.height, int(y_max)))
+
                     detections.append({
-                        'x': int(x_min),
-                        'y': int(y_min),
+                        'x': x_min,
+                        'y': y_min,
                         'width': float(x_max - x_min),
                         'height': int(y_max - y_min),
                         'label': result.names[int(cls)],
-                        'confidence': float(conf)
+                        'confidence': round(float(conf), 2)
                     })#returns json object
-
+    
     return jsonify({'detections': detections})
 
 @app.route('/brighten', methods=['POST'])
 def brighten():
     data = request.get_json()
-    if 'image' not in data:
-        return jsonify({'error': 'No image file provided'}), 400
+    if not data or 'filePath' not in data:
+        return jsonify({'error': 'No image file path provided'}), 400
     
-    # Enhance the image using LIME
-    enhanced_img = enhance_image(data['image'])
+    file_path = data['filePath']
+    if not os.path.exists(file_path):
+        return jsonify({'error': 'Invalid image file path provided'}), 400
+    print("brighten image path", file_path)
+    fileName = file_path.split('/')[-1]
+
+    #check for brightness value
+    hdr = hdr_brightness(file_path)
+    print(f"pre-brighten hdr: {hdr}")
+
+    if 1.5 <= hdr < 4: #sufficient
+        return jsonify({'enhanced_image_path': file_path})
+        
+    # Enhance the image using CLAHE
+    enhanced_img = enhance_image(file_path)
     
-    # Convert the enhanced image to base64
-    enhanced_base64 = numpy_to_base64(enhanced_img)
-    
-    # Return the enhanced image in the response
-    return jsonify({'enhanced_image_url': f"data:image/png;base64,{enhanced_base64}"})
+    #create enhanced image path
+    file_name = f"enhanced_{fileName}"
+    enhanced_img_path = os.path.join(app.config['UPLOAD_FOLDER'], file_name).replace('\\', '/')
 
-def enhance_image(image):
-    """
-    Enhance the input image using the LIME algorithm.
-    """
-    # Initialize the LIME model
-    img_data = base64.b64decode(image.split(',')[1])
-    nparr = np.frombuffer(img_data, np.uint8)
-    img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    
-    # Convert the image to LAB color space
-    lab = cv2.cvtColor(img_np, cv2.COLOR_BGR2LAB)
+    #save the enhanced image
+    cv2.imwrite(enhanced_img_path, enhanced_img)
 
-    # Split the LAB image into L, A, and B channels
-    l_channel, a_channel, b_channel = cv2.split(lab)
-
-    # Apply CLAHE to the L channel
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    l_channel_clahe = clahe.apply(l_channel)
-
-    # Merge the enhanced L channel with the original A and B channels
-    lab_clahe = cv2.merge((l_channel_clahe, a_channel, b_channel))
-
-    # Convert back to BGR color space (numpy)
-    enhanced_img = cv2.cvtColor(lab_clahe, cv2.COLOR_LAB2BGR)
-
-    return enhanced_img
-
-def numpy_to_base64(img):
-    """
-    Convert a NumPy array (OpenCV image) to a base64-encoded string.
-    """
-    # Encode the image into a byte buffer (PNG format)
-    _, buffer = cv2.imencode('.png', img)
-
-    # Convert the byte buffer to a base64 string
-    base64_str = base64.b64encode(buffer).decode('utf-8')
-
-    return base64_str
-
-def pil_to_base64(img):
-    """
-    Convert a PIL image to a base64-encoded string.
-    """
-    buffered = io.BytesIO()
-    img.save(buffered, format="PNG")
-    img_byte_arr = buffered.getvalue()
-    base64_str = base64.b64encode(img_byte_arr).decode('utf-8')
-    return base64_str
-
+    return jsonify({'enhanced_image_path': enhanced_img_path}), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
