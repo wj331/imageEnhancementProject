@@ -1,11 +1,13 @@
 <!-- Upload Image -->
 <nz-form-item>
-  <nz-form-label [nzFor]="'uploadImage'" nzRequired>Upload Image</nz-form-label>
+  <nz-form-label [nzFor]="'uploadFolder'" nzRequired>Upload Folder</nz-form-label>
   <nz-form-control>
     <input
       type="file"
-      id="uploadImage"
+      id="uploadFolder"
       (change)="onFileSelected($event)"
+      webkitdirectory
+      multiple
       accept="image/*"
       style="display: block"
     />
@@ -14,11 +16,11 @@
 </nz-form-item>
 
 <!-- Display Uploaded Image -->
-<nz-card *ngIf="uploadedImagePath" nzBordered [nzTitle]="'Uploaded Image'" style="margin-bottom: 20px;">
-<div style="position: relative;">
-  <img [src]="uploadedImagePath" alt="Original Image" style="max-width: 100%; border: 1px solid #ccc;" (load)="onImageLoad($event)" />
+<nz-card *ngIf="uploadedImages.length > 0" nzBordered [nzTitle]="'Uploaded Image'" style="margin-bottom: 20px;">
+  <div *ngFor= "let image of uploadedImages" style ="margin-bottom: 10px; position: relative;">
+  <img [src]="image.path" alt="Original Image" style="max-width: 100%; border: 1px solid #ccc;" />
   <div
-    *ngFor="let result of detectionResultsOriginal"
+    *ngFor="let result of image.detectionResults"
     [ngStyle]="{
       position: 'absolute',
       border: '2px solid red',
@@ -45,11 +47,11 @@
 </nz-card>
 
 <!-- Display Brightened Image -->
-<nz-card *ngIf="brightenedImagePath" nzBordered [nzTitle]="'Brightened Image'" style="margin-bottom: 20px;">
-  <div style="position: relative;">
-    <img [src]="brightenedImagePath" alt="Brightened Image" style="max-width: 100%; border: 1px solid #ccc;" />
+<nz-card *ngIf="brightenedImages.length > 0" nzBordered [nzTitle]="'Brightened Image'" style="margin-bottom: 20px;">
+  <div *ngFor= "let brightened of brightenedImages" style="margin-bottom: 10px; position: relative;">
+    <img [src]="brightened.path" alt="Brightened Image" style="max-width: 100%; border: 1px solid #ccc;" />
     <div
-      *ngFor="let result of detectionResultsBrightened"
+      *ngFor="let result of brightened.detectionResults"
       [ngStyle]="{
         position: 'absolute',
         border: '2px solid red',

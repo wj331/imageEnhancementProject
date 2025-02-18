@@ -5,17 +5,15 @@ from scipy import signal
 import os
 
 
-def enhance_image(filePath):
+def enhance_image(img_np):
     """
     Enhance the input image using the LIME algorithm.
     """
-    if not os.path.exists(filePath):
-        raise FileNotFoundError(f"Image not found at {filePath}")
-    
-    img_np = cv2.imread(filePath, cv2.IMREAD_COLOR)
+    if img_np is None:
+        raise ValueError("Invalid image provided")
     
     # Convert the image to LAB color space
-    lab = cv2.cvtColor(img_np, cv2.COLOR_BGR2LAB)
+    lab = cv2.cvtColor(img_np, cv2.COLOR_BGR2LAB) #only works with np array
 
     # Split the LAB image into L, A, and B channels
     l_channel, a_channel, b_channel = cv2.split(lab)
@@ -33,26 +31,30 @@ def enhance_image(filePath):
     return enhanced_img
 
 # Converts image into RGB channels
-def img_to_rgb(img_path):
-    img = cv2.imread(img_path)  # BGR format by default
+def img_to_rgb(img):
+    if isinstance(img, str):
+        img = cv2.imread(img)
+    if img is None:
+        raise ValueError("Invalid image provided")
     rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  # Convert to RGB
     # print("rgb image shape: ", rgb_img.shape)
     return rgb_img
 
 
-def compute_rgbmax(img_path):
+def compute_rgbmax(img):
     """
     Compute the RGBmax matrix from the input image.
     The RGBmax matrix is calculated by keeping, for each pixel,
     only the maximum value of the RGB triplet.
 
     Args:
-        img_path (str): Path to the input image.
+        img (str): Path to the input image or the image itself.
     
     Returns:
         numpy.ndarray: The RGBmax matrix (2D array) containing the maximum RGB value for each pixel.
     """
-    rgb_img = img_to_rgb(img_path)
+    
+    rgb_img = img_to_rgb(img)
     # print("rgb image shape: ", rgb_img.shape)
     rgbmax_matrix = np.max(rgb_img, axis=2)  # Shape: (height, width)
     # print("rgb max shape: ", rgbmax_matrix.shape)
@@ -92,12 +94,13 @@ def create_weighting_kernel(image_shape: tuple, sigma: float = 2, H: int = 3): #
     
     return kernel_resized
 
-def hdr_brightness(image_path):
-    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    image_shape = image.shape
+def hdr_brightness(img_gray):
+    if img_gray is None:
+        raise ValueError("Invalid image provided")
+    image_shape = img_gray.shape
     weighting_kernel = create_weighting_kernel(image_shape)
     
-    rgbmax_matrix = compute_rgbmax(image_path)
+    rgbmax_matrix = compute_rgbmax(img_gray)
     filtered_image = rgbmax_matrix * weighting_kernel
     n = filtered_image.size  # Total number of pixels
     rms_filtered_rgmmax = np.sqrt(np.sum(filtered_image**2) / n)
