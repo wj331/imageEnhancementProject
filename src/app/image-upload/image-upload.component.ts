@@ -135,4 +135,60 @@ export class ImageUploadComponent {
         })
       );
     }
+
+    getBrightenedDetections(originalImagePath: string) {
+      const imageFileName = originalImagePath.split('/').pop() || '';
+
+      const brightenedImage = this.brightenedImages.find(img => img.path.includes(imageFileName));
+
+      return brightenedImage?.detectionResults || [];
+    }
+
+    getBrightenedImagePath(uploadedImagePath: string): string | undefined{
+      const fileName = uploadedImagePath.split('/').pop() || '';
+      return this.brightenedImages.find(img => img.path.includes(fileName))?.path;
+    }
+
+    // Method to calculate confidence improvement
+    calculateImprovement(uploadedImage: any): number {
+      const uploadedConfidence = uploadedImage.detectionResults.reduce(
+        (sum: number, result: any) => sum + result.confidence,
+        0
+      );
+      const brightenedPath = this.getBrightenedImagePath(uploadedImage.path);
+      const brightenedImage = this.brightenedImages.find(b => b.path === brightenedPath);
+      if (!brightenedImage) return 0;
+
+      const brightenedConfidence = brightenedImage.detectionResults.reduce(
+        (sum: number, result: any) => sum + result.confidence,
+        0
+      );
+
+      if (uploadedConfidence === 0) {
+        if (brightenedConfidence === 0) {
+          return 0;
+        } else {
+          return 100;
+        }
+      }
+      // Calculate improvement percentage
+      const improvement = ((brightenedConfidence - uploadedConfidence) / uploadedConfidence) * 100;
+      return isNaN(improvement) ? 0 : parseFloat(improvement.toFixed(2));
+    }
+
+    getTotalImprovement(): number {
+      return this.uploadedImages.reduce((sum, image) => sum + this.calculateImprovement(image), 0);
+    }
+    
+    getImprovedCount(): number {
+      return this.uploadedImages.filter(image => this.calculateImprovement(image) > 0).length;
+    }
+
+    getReducedCount(): number {
+      return this.uploadedImages.filter(image => this.calculateImprovement(image) < 0).length;
+    }
+
+    getUnchangedCount(): number {
+      return this.uploadedImages.filter(image => this.calculateImprovement(image) === 0).length;
+    }
 }

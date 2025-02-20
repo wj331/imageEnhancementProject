@@ -1,6 +1,6 @@
-<!-- Upload Image -->
+<!-- Upload Folder -->
 <nz-form-item>
-  <nz-form-label [nzFor]="'uploadFolder'" nzRequired>Upload Folder</nz-form-label>
+  <nz-form-label [nzFor]="'uploadFolder'" nzRequired class="upload-folder-label">Upload Folder</nz-form-label>
   <nz-form-control>
     <input
       type="file"
@@ -9,70 +9,105 @@
       webkitdirectory
       multiple
       accept="image/*"
-      style="display: block"
+      class="file-input"
     />
     <div *ngIf="imageError" class="error">{{ imageError }}</div>
   </nz-form-control>
 </nz-form-item>
 
-<!-- Display Uploaded Image -->
-<nz-card *ngIf="uploadedImages.length > 0" nzBordered [nzTitle]="'Uploaded Image'" style="margin-bottom: 20px;">
-  <div *ngFor= "let image of uploadedImages" style ="margin-bottom: 10px; position: relative;">
-  <img [src]="image.path" alt="Original Image" style="max-width: 100%; border: 1px solid #ccc;" />
-  <div
-    *ngFor="let result of image.detectionResults"
-    [ngStyle]="{
-      position: 'absolute',
-      border: '2px solid red',
-      top: (result.y * scaleY) + 'px',
-      left: (result.x * scaleX) + 'px',
-      width: (result.width * scaleX) + 'px',
-      height: (result.height * scaleY) + 'px'
-    }"
-  >
-    <nz-tag
-      [style]="{
-        backgroundColor: 'red',
-        color: 'red',
-        fontSize: '12px',
-        padding: '2px',
-        position: 'absolute',
-        top: '-20px'
-      }"
-    >
-      {{ result.label }} {{ result.confidence ? '(' + result.confidence.toFixed(2) + ')' : '' }}
-    </nz-tag>
+<!-- Combined Image Display -->
+<div class="table-container">
+  <!-- Table Headers -->
+  <div class="table-header-row">
+    <div class="table-header-cell">Uploaded Images</div>
+    <div class="table-header-cell">Brightened Images</div>
+    <div class="table-header-cell">Improvement</div>
   </div>
-</div>
-</nz-card>
 
-<!-- Display Brightened Image -->
-<nz-card *ngIf="brightenedImages.length > 0" nzBordered [nzTitle]="'Brightened Image'" style="margin-bottom: 20px;">
-  <div *ngFor= "let brightened of brightenedImages" style="margin-bottom: 10px; position: relative;">
-    <img [src]="brightened.path" alt="Brightened Image" style="max-width: 100%; border: 1px solid #ccc;" />
-    <div
-      *ngFor="let result of brightened.detectionResults"
-      [ngStyle]="{
-        position: 'absolute',
-        border: '2px solid red',
-        top: result.y + 'px',
-        left: result.x + 'px',
-        width: result.width + 'px',
-        height: result.height + 'px'
-      }"
-    >
-      <nz-tag
-        [style]="{
-          backgroundColor: 'red',
-          color: 'red',
-          fontSize: '12px',
-          padding: '2px',
-          position: 'absolute',
-          top: '-20px'
-        }"
-      >
-        {{ result.label }} {{ result.confidence ? '(' + result.confidence.toFixed(2) + ')' : '' }}
-      </nz-tag>
+  <!-- Table Rows -->
+  <div *ngFor="let image of uploadedImages" class="table-row">
+    <!-- Uploaded Image Cell -->
+    <div class="table-cell">
+      <div class="image-wrapper">
+        <img [src]="image.path" alt="Original Image" class="image-preview" />
+        <div
+          *ngFor="let result of image.detectionResults"
+          [ngStyle]="{
+            position: 'absolute',
+            border: '2px solid red',
+            top: (result.y * scaleY) + 'px',
+            left: (result.x * scaleX) + 'px',
+            width: (result.width * scaleX) + 'px',
+            height: (result.height * scaleY) + 'px'
+          }"
+          class="detection-box"
+        >
+          <nz-tag
+            [style]="{
+              backgroundColor: 'red',
+              color: 'white',
+              fontSize: '12px',
+              padding: '2px',
+              position: 'absolute',
+              top: '-20px'
+            }"
+            class="detection-tag"
+          >
+            {{ result.label }} {{ result.confidence ? '(' + result.confidence.toFixed(2) + ')' : '' }}
+          </nz-tag>
+        </div>
+      </div>
+    </div>
+
+    <!-- Brightened Image Cell -->
+    <div class="table-cell">
+      <div class="image-wrapper">
+        <img
+          *ngIf="getBrightenedImagePath(image.path)"
+          [src]="getBrightenedImagePath(image.path)"
+          alt="Brightened Image"
+          class="image-preview"
+        />
+        <div
+          *ngFor="let result of getBrightenedDetections(image.path)"
+          [ngStyle]="{
+            position: 'absolute',
+            border: '2px solid red',
+            top: result.y + 'px',
+            left: result.x + 'px',
+            width: result.width + 'px',
+            height: result.height + 'px'
+          }"
+          class="detection-box"
+        >
+          <nz-tag
+            [style]="{
+              backgroundColor: 'red',
+              color: 'white',
+              fontSize: '12px',
+              padding: '2px',
+              position: 'absolute',
+              top: '-20px'
+            }"
+            class="detection-tag"
+          >
+            {{ result.label }} {{ result.confidence ? '(' + result.confidence.toFixed(2) + ')' : '' }}
+          </nz-tag>
+        </div>
+      </div>
+    </div>
+
+    <!-- Improvement Cell -->
+    <div class="table-cell improvement-cell">
+      <p [ngClass] = "calculateImprovement(image) >= 0 ? 'positive' : 'negative'">Confidence Improvement: {{ calculateImprovement(image) }}%</p>
     </div>
   </div>
-  </nz-card>
+
+  <div class = "report-card" *ngIf="uploadedImages.length > 0">
+      <h3> Summary report </h3>
+      <p>Total increment of confidence across all images {{ getTotalImprovement().toFixed(2) }}% </p>
+      <p>Number of Images with Improved Confidence: {{ getImprovedCount() }}</p>
+      <p>Number of Images with Reduced Confidence: {{ getReducedCount() }}</p>
+      <p>Number of Images with No Change: {{ getUnchangedCount() }}</p>    
+  </div>
+</div>

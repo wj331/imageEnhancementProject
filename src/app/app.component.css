@@ -1,0 +1,51 @@
+/* General Styles */
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+  }
+  
+  .main-container {
+    height: 100vh; /* Full viewport height */
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Toolbar Styling */
+  mat-toolbar {
+    display: flex;
+    justify-content: center; /* Center the content horizontally */
+    align-items: center; /* Center the content vertically */
+    position: relative;
+    min-height: 64px; /* Fixed height for the toolbar */
+  }
+  
+  .logo {
+    font-size: 35px; /* Adjust font size as needed */
+    font-weight: bold;
+    text-align: center;
+    white-space: nowrap; /* Prevent text wrapping */
+    width: 100%; /* Ensure the logo spans the full width of the toolbar */
+  }
+  
+  .spacer {
+    flex: 1; /* Pushes other elements to the sides */
+  }
+  
+  /* Content Container Styling */
+  .content-container {
+    flex: 1; /* Makes the container expand to fill available space */
+    padding: 20px; /* Adds some spacing around the content */
+    overflow-y: auto; /* Enables scrolling if content overflows */
+    box-sizing: border-box; /* Ensures padding doesn't affect the width */
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 600px) {
+    .logo {
+      font-size: 16px; /* Reduce font size on smaller screens */
+    }
+  
+    .content-container {
+      padding: 10px; /* Reduce padding on smaller screens */
+    }
+  }
