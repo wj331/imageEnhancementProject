@@ -1,14 +1,49 @@
-import { Component, ChangeDetectorRef} from '@angular/core';
+import { Component, ChangeDetectorRef, OnInit} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { EMPTY, throwError , from, forkJoin} from 'rxjs';
+import { Observable, EMPTY, throwError , from, forkJoin, of, isObservable } from 'rxjs';
 import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzDatePickerModule } from 'ng-zorro-antd/date-picker';
-import { concatMap, tap, catchError, switchMap, map} from 'rxjs/operators';
+import { concatMap, tap, catchError, switchMap, map, shareReplay } from 'rxjs/operators';
+interface ImprovementResult {
+  new_detections: { label: string; confidence: number; position: [number, number, number, number] }[];
+  lost_detections: { label: string; confidence: number; position: [number, number, number, number] }[];
+  label_changes: {
+    original: { label: string; confidence: number; position: [number, number, number, number] };
+    brightened: { label: string; confidence: number; position: [number, number, number, number] };
+    spatial_similarity: number;
+  }[];
+  confidence_changes: {
+    label: string;
+    original_confidence: number;
+    new_confidence: number;
+    change: number;
+    position: [number, number, number, number];
+    spatial_similarity: number;
+  }[];
+  summary: {
+    total_improvements: number;
+    total_degradations: number;
+    total_confidence_changes: number;
+    average_confidence_changes: number;
+    new_detections: number;
+    lost_detections: number;
+    label_changes: number;
+  };
+}
+interface AggregatedImprovement {
+  totalImprovement: number;
+  totalDegradation: number;
+  averageConfidenceChanges: number;
+  newDetections: number;
+  lostDetections: number;
+  labelChanges: number;
+}
+
 
 @Component({
   selector: 'app-image-upload',
@@ -17,7 +52,7 @@ import { concatMap, tap, catchError, switchMap, map} from 'rxjs/operators';
   templateUrl: './image-upload.component.html',
   styleUrls: ['./image-upload.component.css']
 })
-export class ImageUploadComponent {
+export class ImageUploadComponent{
 
   uploadedImages: { path: string, detectionResults: any[] }[] = [];
   brightenedImages: { path: string, detectionResults: any[] }[] = [];
@@ -30,6 +65,7 @@ export class ImageUploadComponent {
   backendUrl = 'http://localhost:5000/';
   scaleX: number = 1;
   scaleY: number = 1;
+  aggregatedImprovement$!: Observable<AggregatedImprovement>;
 
   constructor(private http: HttpClient, private cdRef: ChangeDetectorRef) {}
     onFileSelected(event: Event) {
@@ -149,46 +185,92 @@ export class ImageUploadComponent {
       return this.brightenedImages.find(img => img.path.includes(fileName))?.path;
     }
 
-    // Method to calculate confidence improvement
-    calculateImprovement(uploadedImage: any): number {
-      const uploadedConfidence = uploadedImage.detectionResults.reduce(
-        (sum: number, result: any) => sum + result.confidence,
-        0
-      );
-      const brightenedPath = this.getBrightenedImagePath(uploadedImage.path);
-      const brightenedImage = this.brightenedImages.find(b => b.path === brightenedPath);
-      if (!brightenedImage) return 0;
 
-      const brightenedConfidence = brightenedImage.detectionResults.reduce(
-        (sum: number, result: any) => sum + result.confidence,
-        0
-      );
-
-      if (uploadedConfidence === 0) {
-        if (brightenedConfidence === 0) {
-          return 0;
-        } else {
-          return 100;
-        }
-      }
-      // Calculate improvement percentage
-      const improvement = ((brightenedConfidence - uploadedConfidence) / uploadedConfidence) * 100;
-      return isNaN(improvement) ? 0 : parseFloat(improvement.toFixed(2));
-    }
-
-    getTotalImprovement(): number {
-      return this.uploadedImages.reduce((sum, image) => sum + this.calculateImprovement(image), 0);
-    }
+    calculateImprovement(uploadedImage: any): Observable<ImprovementResult> {
+      const uploadedDetections = uploadedImage.detectionResults || [];
     
-    getImprovedCount(): number {
-      return this.uploadedImages.filter(image => this.calculateImprovement(image) > 0).length;
+      // Wait for brightened detections
+      const brightenedDetections = this.getBrightenedDetections(uploadedImage.path);
+      const brightenedDetectionsList = Array.isArray(brightenedDetections) ? brightenedDetections : [];
+    
+      const requestBody = {
+        uploadedDetections,
+        brightenedDetections: brightenedDetectionsList
+      };
+    
+      console.log("Sending request:", requestBody);
+    
+      let result: ImprovementResult | undefined;
+
+      return this.http.post<ImprovementResult>(
+        `${this.backendUrl}calculate-improvement`,
+        requestBody
+      ).pipe(
+        catchError(error => {
+          console.error("error during improvement calculation", error);
+          return of(this.getDefaultImprovementResult());
+        })
+      )
+    }
+  
+    getDefaultImprovementResult(): ImprovementResult {
+      return {
+        new_detections: [],
+        lost_detections: [],
+        label_changes: [],
+        confidence_changes: [],
+        summary: {
+          total_improvements: 0,
+          total_degradations: 0,
+          total_confidence_changes: 0,
+          average_confidence_changes: 0,
+          new_detections: 0,
+          lost_detections: 0,
+          label_changes: 0
+        }
+      };
     }
 
-    getReducedCount(): number {
-      return this.uploadedImages.filter(image => this.calculateImprovement(image) < 0).length;
+    improvementResultMap: Map<string, ImprovementResult> = new Map<string, ImprovementResult>(); // Store direct results
+    loadingStates: { [imagePath: string]: boolean } = {};
+
+    getImprovementForImage(image: { path: string, detectionResults: any[] }) {
+      if (this.improvementResultMap.has(image.path)) {
+        return this.improvementResultMap.get(image.path);
+      }
+
+      if (this.loadingStates[image.path]) {
+        return undefined;
+      }
+      if (!image.detectionResults || !this.getBrightenedDetections(image.path)?.length) {
+        console.log("Detections not ready yet, skipping improvement calculation.");
+        this.retryImprovementCheck(image)
+        return undefined;
+      }
+      this.loadingStates[image.path] = true;
+      this.calculateImprovement(image).subscribe((improvement) => {
+        this.improvementResultMap.set(image.path, improvement);
+        this.loadingStates[image.path] = false;
+      });
+      return undefined;
     }
 
-    getUnchangedCount(): number {
-      return this.uploadedImages.filter(image => this.calculateImprovement(image) === 0).length;
+    retryImprovementCheck(image: { path: string, detectionResults: any[] }) {
+      if (this.loadingStates[image.path]) return;
+
+      this.loadingStates[image.path] = true;
+      const retryInterval = setInterval(() => {
+        if (image.detectionResults && this.getBrightenedDetections(image.path)?.length) {
+          clearInterval(retryInterval);
+
+          console.log("detections are now ready, calculating improvement...");
+          this.calculateImprovement(image).subscribe((improvement) => {
+            this.improvementResultMap.set(image.path, improvement);
+            this.loadingStates[image.path] = false;
+          });
+          this.getImprovementForImage(image);
+        }
+      }, 5000)
     }
 }
+

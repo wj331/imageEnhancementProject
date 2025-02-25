@@ -130,5 +130,154 @@ def brighten():
     enhanced_img_url = f"http://localhost:5000/uploads/{file_name}"
     return jsonify({'enhanced_image_path': enhanced_img_url}), 200
 
+class Detection:
+    def __init__(self, x, y, width, height, label, confidence):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.label = label
+        self.confidence = confidence
+
+    def get_center(self) -> tuple:
+        return (self.x + self.width / 2, self.y + self.height / 2)
+    
+    def get_area(self) -> float:
+        return self.width * self.height
+    
+@app.route('/calculate-improvement', methods=['POST'])
+def calculate_improvement(spatial_threshold = 0.7, size_threshold = 0.7):
+    data = request.get_json()
+    print('data received!', data)
+
+    if not data or 'uploadedDetections' not in data or 'brightenedDetections' not in data:
+        return jsonify({'error': 'Missing required data'}), 400
+    
+    uploaded_detections = data['uploadedDetections']
+    brightened_detections = data['brightenedDetections']
+
+    def convert_to_detection(detection):
+        return [Detection(**d) for d in detection]
+    
+    def calculate_spatial_similarity(detection1, detection2):
+        center1 = detection1.get_center()
+        center2 = detection2.get_center()
+        center_dist = np.sqrt((center1[0] - center2[0]) ** 2 + (center1[1] - center2[1]) ** 2)
+        
+        #normalize by average detection size
+        avg_size = (np.sqrt(detection1.get_area()) + np.sqrt(detection2.get_area())) / 2
+        normalized_dist = center_dist / avg_size
+
+        #calculate size similarity
+        area_ratio = min(detection1.get_area(), detection2.get_area()) / max(detection1.get_area(), detection2.get_area())
+        
+        #combine distance and size metrics
+        return (1 - normalized_dist) * 0.7 + area_ratio * 0.3
+    
+    orig_dets = convert_to_detection(uploaded_detections)
+    bright_dets = convert_to_detection(brightened_detections)
+
+    results = {
+        'new_detections': [],
+        'lost_detections': [],
+        'label_changes': [],
+        'confidence_changes': [],
+        'summary': {
+            'total_improvements': 0,
+            'total_degradations': 0,
+            'average_confidence_changes': 0
+        }
+    }
+    #track matched detections
+    matched_orig = set()
+    matched_bright = set()
+
+    #find matching detections
+    for i, orig in enumerate(orig_dets):
+        best_match = None
+        best_similarity = spatial_threshold
+
+        for j, bright in enumerate(bright_dets):
+            if bright in matched_bright:
+                continue
+            
+            similarity = calculate_spatial_similarity(orig, bright)
+            if similarity > best_similarity:
+                best_similarity = similarity
+                best_match = bright
+        print("current best match is: ", best_match)
+        if best_match is not None:
+            matched_orig.add(orig)
+            matched_bright.add(best_match)
+
+            print("original label: ", orig.label)
+            print("brightened label: ", best_match.label)
+            #check for label changes
+            if orig.label != best_match.label:
+                print('label change detected')
+                results['label_changes'].append({
+                    'original': {
+                        'label': orig.label,
+                        'confidence': orig.confidence,
+                        'position': (orig.x, orig.y, orig.width, orig.height)
+                    },
+                    'brightened': {
+                        'label': best_match.label,
+                        'confidence': best_match.confidence,
+                        'position': (best_match.x, best_match.y, best_match.width, best_match.height)
+                    },
+                    'spatial_similarity': best_similarity
+                })
+            else:
+                #check for confidence changes
+                #label remains the same
+                confidence_change = best_match.confidence - orig.confidence
+                #care here as change = 0 is still appended in
+                results['confidence_changes'].append({
+                    'label': orig.label,
+                    'original_confidence': orig.confidence,
+                    'new_confidence': best_match.confidence,
+                    'change': confidence_change,
+                    'position': (orig.x, orig.y, orig.width, orig.height),
+                    'spatial_similarity': best_similarity
+                })
+    print("matched Bright: ", matched_bright)
+    print("matched original: ", matched_orig)
+    #case1: new detections (check for bugs here)
+    for i, bright in enumerate(bright_dets):
+        if bright not in matched_bright:
+            results['new_detections'].append({
+                'label': bright.label,
+                'confidence': bright.confidence,
+                'position': (bright.x, bright.y, bright.width, bright.height)
+            })
+    #case2: lost detections
+    for i, orig in enumerate(orig_dets):
+        if orig not in matched_orig: #original detection does not have matching detection
+            results['lost_detections'].append({
+                'label': orig.label,
+                'confidence': orig.confidence,
+                'position': (orig.x, orig.y, orig.width, orig.height)
+            })
+
+    #calculate summary statistics
+    confidence_changes = [change['change'] for change in results['confidence_changes']]
+    
+    results['summary'].update({
+        'total_improvements': len([c for c in confidence_changes if c > 0]),
+        'total_degradations': len([c for c in confidence_changes if c < 0]),
+        'total_confidence_changes': float(np.round(np.sum(confidence_changes), 3)) if confidence_changes else 0,
+        'average_confidence_changes' : float(np.round(np.mean(confidence_changes), 3)) if confidence_changes else 0,
+        'new_detections': len(results['new_detections']),
+        'lost_detections': len(results['lost_detections']),
+        'label_changes': len(results['label_changes']),
+    })
+    print("The summary results are: ", results)
+    for change in results['confidence_changes']:
+        change['change'] = float(round(change['change'], 2))
+        change['spatial_similarity'] = float(np.round(change['spatial_similarity'], 2))
+    return jsonify(results)
+
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

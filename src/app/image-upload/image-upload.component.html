@@ -99,15 +99,39 @@
 
     <!-- Improvement Cell -->
     <div class="table-cell improvement-cell">
-      <p [ngClass] = "calculateImprovement(image) >= 0 ? 'positive' : 'negative'">Confidence Improvement: {{ calculateImprovement(image) }}%</p>
+      <ng-container *ngIf="getImprovementForImage(image) as improvementResult; else loading">
+        <p [ngClass]="(improvementResult?.summary?.average_confidence_changes ?? 0) >= 0 ? 'positive' : 'negative'">
+          Average Confidence Improvement: {{ ((improvementResult?.summary?.average_confidence_changes ?? 0) * 100) | number:'1.2-2' }}%
+        </p>
+        
+        <p [ngClass]="(improvementResult?.summary?.total_confidence_changes ?? 0) >= 0 ? 'positive' : 'negative'">
+          Total Confidence Improvement: {{ ((improvementResult?.summary?.total_confidence_changes ?? 0) * 100) | number:'1.2-2' }}%
+        </p>
+        
+        <p>Total Improvements: {{ improvementResult?.summary?.total_improvements ?? 0 }}</p>
+        <p>Total Degradations: {{ improvementResult?.summary?.total_degradations ?? 0 }}</p>
+        <p>New Detections: {{ improvementResult?.summary?.new_detections ?? 0 }}</p>
+        <p>Lost Detections: {{ improvementResult?.summary?.lost_detections ?? 0 }}</p>
+        <p>Label Changes: {{ improvementResult?.summary?.label_changes ?? 0 }}</p>
+      </ng-container>
+      
+      <ng-template #loading>
+        <p>Loading Improvement...</p>
+      </ng-template>
     </div>
   </div>
 
-  <div class = "report-card" *ngIf="uploadedImages.length > 0">
-      <h3> Summary report </h3>
-      <p>Total increment of confidence across all images {{ getTotalImprovement().toFixed(2) }}% </p>
-      <p>Number of Images with Improved Confidence: {{ getImprovedCount() }}</p>
-      <p>Number of Images with Reduced Confidence: {{ getReducedCount() }}</p>
-      <p>Number of Images with No Change: {{ getUnchangedCount() }}</p>    
+  <!-- Summary Report -->
+  <div class="report-card" *ngIf="uploadedImages.length > 0">
+    <h3>Summary Report</h3>
+    <ng-container *ngIf="aggregatedImprovement$ | async as aggregatedImprovement">
+      <p>Average confidence increment across all images: {{ aggregatedImprovement.averageConfidenceChanges.toFixed(2) }}%</p>
+      <p>Number of Images with Improved Confidence: {{ aggregatedImprovement.totalImprovement }}</p>
+      <p>Number of Images with Reduced Confidence: {{ aggregatedImprovement.totalDegradation }}</p>
+      <p>Number of New Detections: {{ aggregatedImprovement.newDetections }}</p>
+      <p>Number of Lost Detections: {{ aggregatedImprovement.lostDetections }}</p>
+      <p>Number of Label Changes: {{ aggregatedImprovement.labelChanges }}</p>
+      <p>Number of Images with No Change: {{ uploadedImages.length - (aggregatedImprovement.totalImprovement + aggregatedImprovement.totalDegradation) }}</p>
+    </ng-container>
   </div>
 </div>
