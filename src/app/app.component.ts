@@ -6,12 +6,14 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { OverlayContainer } from '@angular/cdk/overlay';
+import { ImageTableComponent } from './image-table/image-table.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [
     ImageUploadComponent,
+    ImageTableComponent,
     MatToolbarModule,
     MatButtonModule,
     MatSidenavModule,

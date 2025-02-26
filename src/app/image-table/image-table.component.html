@@ -1,0 +1,119 @@
+
+<!-- Combined Image Display -->
+<div class="table-container">
+    <!-- Summary Report -->
+  <div class="report-card" *ngIf="uploadedImages.length > 0">
+    <h3 class = "summary-report">Summary Report</h3>
+    <p [ngClass]="(aggregatedImprovement?.averageConfidenceChanges ?? 0) >= 0 ? 'positive' : 'negative'">Average Confidence Change: {{ aggregatedImprovement?.averageConfidenceChanges.toFixed(2) }}%</p>
+    <p [ngClass]="(aggregatedImprovement?.totalConfidenceChanges ?? 0) >= 0 ? 'positive' : 'negative'">Total Confidence Change: {{ aggregatedImprovement?.totalConfidenceChanges.toFixed(2) }}%</p>
+    <p>Number of Images with Improved Confidence: {{ aggregatedImprovement?.totalImprovement }}</p>
+    <p>Number of Images with Reduced Confidence: {{ aggregatedImprovement?.totalDegradation }}</p>
+    <p>Number of Images with No Change: {{ uploadedImages.length - (aggregatedImprovement?.totalImprovement + aggregatedImprovement?.totalDegradation) }}</p>
+    <p>Number of Images with New Detections: {{ aggregatedImprovement?.newDetections }}</p>
+    <p>Number of Images with Lost Detections: {{ aggregatedImprovement?.lostDetections }}</p>
+    <p>Number of Images with Label Changes: {{ aggregatedImprovement?.labelChanges }}</p>
+  </div>
+  <!-- Table Headers -->
+  <div class="table-header-row">
+    <div class="table-header-cell">Uploaded Images</div>
+    <div class="table-header-cell">Brightened Images</div>
+    <div class="table-header-cell">Improvement</div>
+  </div>
+
+  <!-- Table Rows -->
+  <div *ngFor="let image of uploadedImages" class="table-row">
+    <!-- Uploaded Image Cell -->
+    <div class="table-cell">
+      <div class="image-wrapper">
+        <img [src]="image.path" alt="Original Image" class="image-preview" />
+        <div
+          *ngFor="let result of image.detectionResults"
+          [ngStyle]="{
+            position: 'absolute',
+            border: '2px solid red',
+            top: (result.y * scaleY) + 'px',
+            left: (result.x * scaleX) + 'px',
+            width: (result.width * scaleX) + 'px',
+            height: (result.height * scaleY) + 'px'
+          }"
+          class="detection-box"
+        >
+          <nz-tag
+            [style]="{
+              backgroundColor: 'red',
+              color: 'white',
+              fontSize: '12px',
+              padding: '2px',
+              position: 'absolute',
+              top: '-20px'
+            }"
+            class="detection-tag"
+          >
+            {{ result.label }} {{ result.confidence ? '(' + result.confidence.toFixed(2) + ')' : '' }}
+          </nz-tag>
+        </div>
+      </div>
+    </div>
+
+    <!-- Brightened Image Cell -->
+    <div class="table-cell">
+      <div class="image-wrapper">
+        <img
+          *ngIf="getBrightenedImagePath(image.path)"
+          [src]="getBrightenedImagePath(image.path)"
+          alt="Brightened Image"
+          class="image-preview"
+        />
+        <div
+          *ngFor="let result of getBrightenedDetections(image.path)"
+          [ngStyle]="{
+            position: 'absolute',
+            border: '2px solid red',
+            top: result.y + 'px',
+            left: result.x + 'px',
+            width: result.width + 'px',
+            height: result.height + 'px'
+          }"
+          class="detection-box"
+        >
+          <nz-tag
+            [style]="{
+              backgroundColor: 'red',
+              color: 'white',
+              fontSize: '12px',
+              padding: '2px',
+              position: 'absolute',
+              top: '-20px'
+            }"
+            class="detection-tag"
+          >
+            {{ result.label }} {{ result.confidence ? '(' + result.confidence.toFixed(2) + ')' : '' }}
+          </nz-tag>
+        </div>
+      </div>
+    </div>
+
+    <!-- Improvement Cell -->
+    <div class="table-cell improvement-cell">
+      <ng-container *ngIf="getImprovementForImage(image) as improvementResult; else loading">
+        <p [ngClass]="(improvementResult?.summary?.average_confidence_changes ?? 0) >= 0 ? 'positive' : 'negative'">
+          Average Confidence Improvement: {{ ((improvementResult?.summary?.average_confidence_changes ?? 0) * 100) | number:'1.2-2' }}%
+        </p>
+        
+        <p [ngClass]="(improvementResult?.summary?.total_confidence_changes ?? 0) >= 0 ? 'positive' : 'negative'">
+          Total Confidence Improvement: {{ ((improvementResult?.summary?.total_confidence_changes ?? 0) * 100) | number:'1.2-2' }}%
+        </p>
+        
+        <p>Total Improvements: {{ improvementResult?.summary?.total_improvements ?? 0 }}</p>
+        <p>Total Degradations: {{ improvementResult?.summary?.total_degradations ?? 0 }}</p>
+        <p>New Detections: {{ improvementResult?.summary?.new_detections ?? 0 }}</p>
+        <p>Lost Detections: {{ improvementResult?.summary?.lost_detections ?? 0 }}</p>
+        <p>Label Changes: {{ improvementResult?.summary?.label_changes ?? 0 }}</p>
+      </ng-container>
+      
+      <ng-template #loading>
+        <p>Loading Improvement...</p>
+      </ng-template>
+    </div>
+  </div>
+</div>
