@@ -1,7 +1,7 @@
 import { Component, ChangeDetectorRef, OnInit} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Observable, EMPTY, throwError , from, forkJoin, of, isObservable } from 'rxjs';
+import { Observable, EMPTY, throwError , from, forkJoin, of, isObservable, combineLatest } from 'rxjs';
 import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzFormModule } from 'ng-zorro-antd/form';
@@ -36,9 +36,10 @@ interface ImprovementResult {
   };
 }
 interface AggregatedImprovement {
+  averageConfidenceChange: number;
+  totalConfidenceChange: number;
   totalImprovement: number;
   totalDegradation: number;
-  averageConfidenceChanges: number;
   newDetections: number;
   lostDetections: number;
   labelChanges: number;
@@ -65,7 +66,16 @@ export class ImageUploadComponent{
   backendUrl = 'http://localhost:5000/';
   scaleX: number = 1;
   scaleY: number = 1;
-  aggregatedImprovement$!: Observable<AggregatedImprovement>;
+  aggregatedImprovement: any = {
+    averageConfidenceChanges: 0,
+    totalConfidenceChanges: 0,
+    totalImprovement: 0,
+    totalDegradation: 0,
+    newDetections: 0,
+    lostDetections: 0,
+    labelChanges: 0,
+  };
+  
 
   constructor(private http: HttpClient, private cdRef: ChangeDetectorRef) {}
     onFileSelected(event: Event) {
@@ -251,6 +261,8 @@ export class ImageUploadComponent{
       this.calculateImprovement(image).subscribe((improvement) => {
         this.improvementResultMap.set(image.path, improvement);
         this.loadingStates[image.path] = false;
+        console.log("improvement for this image is obtained", improvement);
+        this.calculateAggregatedImprovement(improvement);
       });
       return undefined;
     }
@@ -267,10 +279,31 @@ export class ImageUploadComponent{
           this.calculateImprovement(image).subscribe((improvement) => {
             this.improvementResultMap.set(image.path, improvement);
             this.loadingStates[image.path] = false;
+            console.log("improvement for this image is obtained", improvement);
+            this.calculateAggregatedImprovement(improvement);
           });
           this.getImprovementForImage(image);
         }
       }, 5000)
+    }
+    calculateAggregatedImprovement(improvement : ImprovementResult) {
+      this.aggregatedImprovement.averageConfidenceChanges += (improvement.summary.average_confidence_changes * 100);
+      this.aggregatedImprovement.totalConfidenceChanges += (improvement.summary.total_confidence_changes * 100);
+
+      if (improvement.summary.total_confidence_changes > 0) {
+        this.aggregatedImprovement.totalImprovement += 1;
+      } else if (improvement.summary.total_confidence_changes < 0) {
+        this.aggregatedImprovement.totalDegradation += 1;
+      }
+      if (improvement.summary.new_detections > 0) {
+        this.aggregatedImprovement.newDetections += 1;
+      }
+      if (improvement.summary.lost_detections > 0) {
+        this.aggregatedImprovement.lostDetections += 1;
+      }
+      if (improvement.summary.label_changes > 0) {
+        this.aggregatedImprovement.labelChanges += 1;
+      }
     }
 }
 

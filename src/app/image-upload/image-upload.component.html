@@ -121,17 +121,16 @@
     </div>
   </div>
 
-  <!-- Summary Report -->
+   <!-- Summary Report -->
   <div class="report-card" *ngIf="uploadedImages.length > 0">
-    <h3>Summary Report</h3>
-    <ng-container *ngIf="aggregatedImprovement$ | async as aggregatedImprovement">
-      <p>Average confidence increment across all images: {{ aggregatedImprovement.averageConfidenceChanges.toFixed(2) }}%</p>
-      <p>Number of Images with Improved Confidence: {{ aggregatedImprovement.totalImprovement }}</p>
-      <p>Number of Images with Reduced Confidence: {{ aggregatedImprovement.totalDegradation }}</p>
-      <p>Number of New Detections: {{ aggregatedImprovement.newDetections }}</p>
-      <p>Number of Lost Detections: {{ aggregatedImprovement.lostDetections }}</p>
-      <p>Number of Label Changes: {{ aggregatedImprovement.labelChanges }}</p>
-      <p>Number of Images with No Change: {{ uploadedImages.length - (aggregatedImprovement.totalImprovement + aggregatedImprovement.totalDegradation) }}</p>
-    </ng-container>
+    <h3 class = "summary-report">Summary Report</h3>
+    <p [ngClass]="(aggregatedImprovement?.averageConfidenceChanges ?? 0) >= 0 ? 'positive' : 'negative'">Average Confidence Change: {{ aggregatedImprovement?.averageConfidenceChanges.toFixed(2) }}%</p>
+    <p [ngClass]="(aggregatedImprovement?.totalConfidenceChanges ?? 0) >= 0 ? 'positive' : 'negative'">Total Confidence Change: {{ aggregatedImprovement?.totalConfidenceChanges.toFixed(2) }}%</p>
+    <p>Number of Images with Improved Confidence: {{ aggregatedImprovement?.totalImprovement }}</p>
+    <p>Number of Images with Reduced Confidence: {{ aggregatedImprovement?.totalDegradation }}</p>
+    <p>Number of Images with No Change: {{ uploadedImages.length - (aggregatedImprovement?.totalImprovement + aggregatedImprovement?.totalDegradation) }}</p>
+    <p>Number of Images with New Detections: {{ aggregatedImprovement?.newDetections }}</p>
+    <p>Number of Images with Lost Detections: {{ aggregatedImprovement?.lostDetections }}</p>
+    <p>Number of Images with Label Changes: {{ aggregatedImprovement?.labelChanges }}</p>
   </div>
 </div>
