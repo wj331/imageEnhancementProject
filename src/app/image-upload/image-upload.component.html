@@ -17,6 +17,18 @@
 
 <!-- Combined Image Display -->
 <div class="table-container">
+    <!-- Summary Report -->
+  <div class="report-card" *ngIf="uploadedImages.length > 0">
+    <h3 class = "summary-report">Summary Report</h3>
+    <p [ngClass]="(aggregatedImprovement?.averageConfidenceChanges ?? 0) >= 0 ? 'positive' : 'negative'">Average Confidence Change: {{ aggregatedImprovement?.averageConfidenceChanges.toFixed(2) }}%</p>
+    <p [ngClass]="(aggregatedImprovement?.totalConfidenceChanges ?? 0) >= 0 ? 'positive' : 'negative'">Total Confidence Change: {{ aggregatedImprovement?.totalConfidenceChanges.toFixed(2) }}%</p>
+    <p>Number of Images with Improved Confidence: {{ aggregatedImprovement?.totalImprovement }}</p>
+    <p>Number of Images with Reduced Confidence: {{ aggregatedImprovement?.totalDegradation }}</p>
+    <p>Number of Images with No Change: {{ uploadedImages.length - (aggregatedImprovement?.totalImprovement + aggregatedImprovement?.totalDegradation) }}</p>
+    <p>Number of Images with New Detections: {{ aggregatedImprovement?.newDetections }}</p>
+    <p>Number of Images with Lost Detections: {{ aggregatedImprovement?.lostDetections }}</p>
+    <p>Number of Images with Label Changes: {{ aggregatedImprovement?.labelChanges }}</p>
+  </div>
   <!-- Table Headers -->
   <div class="table-header-row">
     <div class="table-header-cell">Uploaded Images</div>
@@ -119,18 +131,5 @@
         <p>Loading Improvement...</p>
       </ng-template>
     </div>
-  </div>
-
-   <!-- Summary Report -->
-  <div class="report-card" *ngIf="uploadedImages.length > 0">
-    <h3 class = "summary-report">Summary Report</h3>
-    <p [ngClass]="(aggregatedImprovement?.averageConfidenceChanges ?? 0) >= 0 ? 'positive' : 'negative'">Average Confidence Change: {{ aggregatedImprovement?.averageConfidenceChanges.toFixed(2) }}%</p>
-    <p [ngClass]="(aggregatedImprovement?.totalConfidenceChanges ?? 0) >= 0 ? 'positive' : 'negative'">Total Confidence Change: {{ aggregatedImprovement?.totalConfidenceChanges.toFixed(2) }}%</p>
-    <p>Number of Images with Improved Confidence: {{ aggregatedImprovement?.totalImprovement }}</p>
-    <p>Number of Images with Reduced Confidence: {{ aggregatedImprovement?.totalDegradation }}</p>
-    <p>Number of Images with No Change: {{ uploadedImages.length - (aggregatedImprovement?.totalImprovement + aggregatedImprovement?.totalDegradation) }}</p>
-    <p>Number of Images with New Detections: {{ aggregatedImprovement?.newDetections }}</p>
-    <p>Number of Images with Lost Detections: {{ aggregatedImprovement?.lostDetections }}</p>
-    <p>Number of Images with Label Changes: {{ aggregatedImprovement?.labelChanges }}</p>
   </div>
 </div>

@@ -271,8 +271,12 @@ export class ImageUploadComponent{
       if (this.loadingStates[image.path]) return;
 
       this.loadingStates[image.path] = true;
+      let attempts = 0;
+      const maxAttempts = 4;
+
       const retryInterval = setInterval(() => {
-        if (image.detectionResults && this.getBrightenedDetections(image.path)?.length) {
+        attempts ++;
+        if ((image.detectionResults && this.getBrightenedDetections(image.path)?.length) || (attempts >= maxAttempts)) {
           clearInterval(retryInterval);
 
           console.log("detections are now ready, calculating improvement...");
