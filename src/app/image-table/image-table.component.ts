@@ -187,4 +187,23 @@ export class ImageTableComponent {
       this.aggregatedImprovement.labelChanges += 1;
     }
   }
+
+  getImageScale(imagePath: string, imgElement: HTMLImageElement) {
+    const originalWidth = imgElement.naturalWidth; // Original image width
+    const originalHeight = imgElement.naturalHeight; // Original image height
+  
+    const displayedWidth = imgElement.clientWidth; // Displayed image width
+    const displayedHeight = imgElement.clientHeight; // Displayed image height
+  
+    const scaleX = displayedWidth / originalWidth;
+    const scaleY = displayedHeight / originalHeight;
+  
+    return { scaleX, scaleY };
+  }
+  
+  onImageLoad(image: any, imagePath: string) {
+    const scales = this.getImageScale(imagePath, image.target);
+    this.scaleX = scales.scaleX;
+    this.scaleY = scales.scaleY;
+  }  
 }

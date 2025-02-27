@@ -58,8 +58,8 @@ def detect():
     if img is None:
         return jsonify({'error': 'Failed to decode image'}), 400
     
-    # model = YOLO(r"C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/uno.pt")
-    model = YOLO(r"C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/yolov8s.pt")
+    model = YOLO(r"C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/uno.pt")
+    # model = YOLO(r"C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/yolov8s.pt")
     # Perform inference
     results = model(img)
 
@@ -114,7 +114,7 @@ def brighten():
     hdr = hdr_brightness(img)
     print(f"pre-brighten hdr: {hdr}")
 
-    if 1.5 <= hdr < 4: #sufficient
+    if 2 <= hdr < 4: #sufficient
         return jsonify({'enhanced_image_path': img_url}), 200
 
     # Enhance the image using CLAHE
