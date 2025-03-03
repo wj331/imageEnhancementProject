@@ -41,19 +41,24 @@ def train(config):
 	train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=config.train_batch_size, shuffle=True, num_workers=config.num_workers, pin_memory=True)
 
 
-	#4 losses
-	L_color = Myloss.L_color()
+	#model learns by optimized these self-supervised losses
+	L_color = Myloss.L_color() #color
 	L_spa = Myloss.L_spa() #spatial loss
 
-	L_exp = Myloss.L_exp(16,0.6) #exposure loss
+	L_exp = Myloss.L_exp(16,0.45) #exposure loss
 	L_TV = Myloss.L_TV() #total variation loss
 
 	#Adam optimizer
 	optimizer = torch.optim.Adam(DCE_net.parameters(), lr=config.lr, weight_decay=config.weight_decay)
 	
+	best_loss = float('inf')
+	best_epoch = 0
+	
 	DCE_net.train()
 
 	for epoch in range(config.num_epochs):
+		epoch_loss = 0
+		num_batches = 0
 		for iteration, img_lowlight in enumerate(train_loader):
 			#move image to gpu
 			img_lowlight = img_lowlight.cuda()
@@ -67,11 +72,13 @@ def train(config):
 
 			loss_col = 5*torch.mean(L_color(enhanced_image))
 
-			loss_exp = 10*torch.mean(L_exp(enhanced_image))
+			loss_exp = 5*torch.mean(L_exp(enhanced_image))
 			
 			
 			# summed loss
 			loss =  Loss_TV + loss_spa + loss_col + loss_exp
+			epoch_loss += loss.item()
+			num_batches += 1
 
 			#backpropagation
 			optimizer.zero_grad()
@@ -83,7 +90,16 @@ def train(config):
 				print("Loss at iteration", iteration+1, ":", loss.item())
 			if ((iteration+1) % config.snapshot_iter) == 0:
 				#saves model parameters to a file
-				torch.save(DCE_net.state_dict(), config.snapshots_folder + "Epoch" + str(epoch) + '.pth') 		
+				torch.save(DCE_net.state_dict(), config.snapshots_folder + "Epoch" + str(epoch) + '.pth')
+		epoch_loss /= num_batches
+
+		if epoch_loss < best_loss:
+			best_loss = epoch_loss
+			best_epoch = epoch + 1
+			torch.save(DCE_net.state_dict(), config.snapshots_folder + "best.pth")
+			print("Epoch", epoch, "completed. Average Loss:", epoch_loss)
+	#print epoch with lowest loss
+	print(f"Best epoch: {best_epoch} with loss: {best_loss}") 		
 
 
 

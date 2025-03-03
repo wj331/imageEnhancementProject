@@ -27,26 +27,28 @@
       <div class="image-wrapper">
         <img [src]="image.path" (load)="onImageLoad($event, image.path)" alt="Original Image" class="image-preview" />
         <div
-          *ngFor="let result of image.detectionResults"
+          *ngFor="let result of image.detectionResults; let index = index"
           [ngStyle]="{
             position: 'absolute',
             border: '2px solid red',
             top: (result.y * scaleY) + 'px',
             left: (result.x * scaleX) + 'px',
             width: (result.width * scaleX) + 'px',
-            height: (result.height * scaleY) + 'px'
+            height: (result.height * scaleY) + 'px',
+            opacity: 0.7
           }"
           class="detection-box"
         >
           <nz-tag
-            [style]="{
-              backgroundColor: 'red',
-              color: 'white',
-              fontSize: '12px',
-              padding: '2px',
-              position: 'absolute',
-              top: '-20px'
-            }"
+          [style]="{
+            backgroundColor: 'red',
+            color: 'white',
+            fontSize: '12px',
+            padding: '2px',
+            position: 'absolute',
+            top: (-20 - (index * 25)) + 'px',
+            left: '0px'
+          }"
             class="detection-tag"
           >
             {{ result.label }} {{ result.confidence ? '(' + result.confidence.toFixed(2) + ')' : '' }}
@@ -66,14 +68,15 @@
           class="image-preview"
         />
         <div
-          *ngFor="let result of getBrightenedDetections(image.path)"
+          *ngFor="let result of getBrightenedDetections(image.path); let index = index"
           [ngStyle]="{
             position: 'absolute',
             border: '2px solid red',
             top: (result.y * scaleY) + 'px',
             left: (result.x * scaleX) + 'px',
             width: (result.width * scaleX) + 'px',
-            height: (result.height * scaleY) + 'px'
+            height: (result.height * scaleY) + 'px',
+            opacity: 0.7
           }"
           class="detection-box"
         >
@@ -84,7 +87,8 @@
               fontSize: '12px',
               padding: '2px',
               position: 'absolute',
-              top: '-20px'
+              top: (-20 - (index * 25)) + 'px',
+              left: '0px'
             }"
             class="detection-tag"
           >

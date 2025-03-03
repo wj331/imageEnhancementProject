@@ -41,6 +41,6 @@ testem.log
 .DS_Store
 Thumbs.db
 
-/Zero-DCE/Zero-DCE_code/snapshots
+/ZeroDCE/ZeroDCE_code/snapshots
 
 /backend/uploads

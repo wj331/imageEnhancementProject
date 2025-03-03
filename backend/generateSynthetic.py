@@ -24,8 +24,8 @@ def process_image(image_path):
 
 def main():
     # Define input and output folders
-    input_folder = "C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//sample images//pill test"
-    output_folder = "C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//sample images//pill test_dark"
+    input_folder = "C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//sample images//Huge Image Dataset//JPEGImages"
+    output_folder = "C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//sample images//low_light_synthetic//JPEGImages_lowlight_synthetic"
 
     # Ensure the output folder exists
     os.makedirs(output_folder, exist_ok=True)
