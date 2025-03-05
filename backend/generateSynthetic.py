@@ -14,18 +14,18 @@ def process_image(image_path):
     alpha = random.uniform(0.4, 0.5)
     beta = random.randint(-20, -15)
     darker_image = cv2.convertScaleAbs(image, alpha=alpha, beta=beta)  # alpha <1 darkens, beta <0 reduces brightness
+    return darker_image
 
-    # # Add noise
-    # noise = np.random.normal(0, 0.4, darker_image.shape).astype(np.uint8)  # Gaussian noise
+    # # # Add noise
+    # noise = np.random.normal(0, 0.3, darker_image.shape).astype(np.uint8)  # Gaussian noise
     # noisy_image = cv2.add(darker_image, noise)
 
     # return noisy_image
-    return darker_image
 
 def main():
     # Define input and output folders
-    input_folder = "C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//sample images//Huge Image Dataset//JPEGImages"
-    output_folder = "C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//sample images//low_light_synthetic//JPEGImages_lowlight_synthetic"
+    input_folder = "C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//sample images//mst-e_data//mst-e_data//only darker"
+    output_folder = "C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//sample images//mst-e_data//mst-e_data//only darker//synthetic_dark"
 
     # Ensure the output folder exists
     os.makedirs(output_folder, exist_ok=True)

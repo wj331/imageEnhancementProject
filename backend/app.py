@@ -198,31 +198,44 @@ def calculate_improvement(spatial_threshold = 0.7, size_threshold = 0.7):
         }
     }
     #track matched detections
-    matched_orig = set()
-    matched_bright = set()
+    matched_orig = [None] * len(orig_dets)
+    matched_bright = [None] * len(bright_dets)
+    highestSpatial = [None] * len(bright_dets)
 
     #find matching detections
     for i, orig in enumerate(orig_dets):
         best_match = None
+        best_match_index = None
         best_similarity = spatial_threshold
 
         for j, bright in enumerate(bright_dets):
-            if bright in matched_bright:
-                continue
-            
             similarity = calculate_spatial_similarity(orig, bright)
-            if similarity > best_similarity:
-                best_similarity = similarity
-                best_match = bright
-        print("current best match is: ", best_match)
+            print(f"spatial similarity between {orig.label} and {bright.label} is: ", similarity)
+            if highestSpatial[j] is None:
+                if similarity > best_similarity or (similarity >= best_similarity - 0.01 and bright.label == orig.label):
+                    best_similarity = similarity
+                    best_match = bright
+                    best_match_index = j
+            if highestSpatial[j] is not None:
+                print("previous highestSpatial is :", highestSpatial[j])
+                if similarity >= highestSpatial[j] - 0.01 and bright.label == orig.label:#change previously set
+                    prevMatched = matched_bright[j]#yellow
+                    prevIndex = orig_dets.index(prevMatched) #index of yellow
+                    matched_orig[prevIndex] = None
+                    best_match = bright
+                    best_match_index = j
         if best_match is not None:
-            matched_orig.add(orig)
-            matched_bright.add(best_match)
-
+            matched_orig[i] = best_match
+            matched_bright[best_match_index] = orig
+            highestSpatial[best_match_index] = best_similarity
+    for j, bright in enumerate(bright_dets):
+        print("current best match is: ", matched_bright[j])
+        if matched_bright[j] is not None:
+            orig = matched_bright[j]
             print("original label: ", orig.label)
-            print("brightened label: ", best_match.label)
+            print("brightened label: ", bright.label)
             #check for label changes
-            if orig.label != best_match.label:
+            if orig.label != bright.label:
                 print('label change detected')
                 results['label_changes'].append({
                     'original': {
@@ -231,30 +244,30 @@ def calculate_improvement(spatial_threshold = 0.7, size_threshold = 0.7):
                         'position': (orig.x, orig.y, orig.width, orig.height)
                     },
                     'brightened': {
-                        'label': best_match.label,
-                        'confidence': best_match.confidence,
-                        'position': (best_match.x, best_match.y, best_match.width, best_match.height)
+                        'label': bright.label,
+                        'confidence': bright.confidence,
+                        'position': (bright.x, bright.y, bright.width, bright.height)
                     },
-                    'spatial_similarity': best_similarity
+                    'spatial_similarity': highestSpatial[j]
                 })
             else:
                 #check for confidence changes
                 #label remains the same
-                confidence_change = best_match.confidence - orig.confidence
+                confidence_change = bright.confidence - orig.confidence
                 #care here as change = 0 is still appended in
                 results['confidence_changes'].append({
                     'label': orig.label,
                     'original_confidence': orig.confidence,
-                    'new_confidence': best_match.confidence,
+                    'new_confidence': bright.confidence,
                     'change': confidence_change,
                     'position': (orig.x, orig.y, orig.width, orig.height),
-                    'spatial_similarity': best_similarity
+                    'spatial_similarity': highestSpatial[j]
                 })
     print("matched Bright: ", matched_bright)
     print("matched original: ", matched_orig)
     #case1: new detections (check for bugs here)
     for i, bright in enumerate(bright_dets):
-        if bright not in matched_bright:
+        if matched_bright[i] is None:
             results['new_detections'].append({
                 'label': bright.label,
                 'confidence': bright.confidence,
@@ -262,7 +275,7 @@ def calculate_improvement(spatial_threshold = 0.7, size_threshold = 0.7):
             })
     #case2: lost detections
     for i, orig in enumerate(orig_dets):
-        if orig not in matched_orig: #original detection does not have matching detection
+        if matched_orig[i] is None: #original detection does not have matching detection
             results['lost_detections'].append({
                 'label': orig.label,
                 'confidence': orig.confidence,

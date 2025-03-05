@@ -45,7 +45,7 @@ def train(config):
 	L_color = Myloss.L_color() #color
 	L_spa = Myloss.L_spa() #spatial loss
 
-	L_exp = Myloss.L_exp(16,0.45) #exposure loss
+	L_exp = Myloss.L_exp(16,0.5) #exposure loss
 	L_TV = Myloss.L_TV() #total variation loss
 
 	#Adam optimizer
@@ -54,6 +54,11 @@ def train(config):
 	best_loss = float('inf')
 	best_epoch = 0
 	
+	#early stopping
+	patience = 8
+	patience_counter = 0
+	min_delta = 1e-4
+
 	DCE_net.train()
 
 	for epoch in range(config.num_epochs):
@@ -93,6 +98,16 @@ def train(config):
 				torch.save(DCE_net.state_dict(), config.snapshots_folder + "Epoch" + str(epoch) + '.pth')
 		epoch_loss /= num_batches
 
+		#check for early stopping
+		if best_loss - epoch_loss < min_delta:
+			patience_counter += 1
+			print(f"No significant improvement for {patience_counter} epoch(s). Patience left: {patience - patience_counter}")
+			if patience_counter > patience:
+				print("early stopping triggered")
+				break
+		else:
+			patience_counter = 0
+	
 		if epoch_loss < best_loss:
 			best_loss = epoch_loss
 			best_epoch = epoch + 1
