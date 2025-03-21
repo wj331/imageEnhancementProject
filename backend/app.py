@@ -11,6 +11,7 @@ from .utils.image_utils import numpy_to_base64
 import os
 import cv2
 from .services.zerodceEnhancement import enhance_image_zerodce
+from .services.retinexformerEnhancement import enhance_image_retinexformer
 
 app = Flask(__name__)
 CORS(app)  # Enable Cross-Origin Resource Sharing (CORS)
@@ -123,12 +124,15 @@ def brighten():
     if 2.5 <= hdr < 4: #sufficient
         return jsonify({'enhanced_image_path': img_url}), 200
 
-    # # Enhance the image using CLAHE
+    # # # Enhance the image using CLAHE
     # enhanced_img = enhance_image(img)
 
     #Enhance the image using Zero-DCE
-    enhanced_img = enhance_image_zerodce(img)
+    # enhanced_img = enhance_image_zerodce(img)
     
+    #Enhance the image using RetinexFormer
+    enhanced_img = enhance_image_retinexformer(img)
+
     #create enhanced image path
     file_name = f"enhanced_{os.path.basename(img_url)}"
     enhanced_img_path = os.path.join(app.config['UPLOAD_FOLDER'], file_name).replace('\\', '/')

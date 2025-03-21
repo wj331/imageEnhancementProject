@@ -1,7 +1,7 @@
 import time
 import torch
 import numpy as np
-from ..model import model
+from ..model import zerodce
 import os
 
 def enhance_image_zerodce(img_np):
@@ -17,10 +17,10 @@ def enhance_image_zerodce(img_np):
     img_tensor = img_tensor.to(device).unsqueeze(0)
 
     # Load the Zero-DCE model
-    DCE_net = model.enhance_net_nopool().to(device)
+    DCE_net = zerodce.enhance_net_nopool().to(device)
 
     #load pretrained weights
-    weight_path = r'C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//Image Enhancement Project//image-enhancement-app//backend//services//snapshots//best5.0.pth'
+    weight_path = r'C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//Image Enhancement Project//image-enhancement-app//backend//services//dceweights//Epoch199.pth'
     # weight_path = r'C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//Image Enhancement Project//image-enhancement-app//backend//services//snapshots//Epoch199.pth'
     DCE_net.load_state_dict(torch.load(weight_path, map_location = device))
     DCE_net.eval()
