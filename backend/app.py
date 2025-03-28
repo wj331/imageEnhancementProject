@@ -12,6 +12,7 @@ import os
 import cv2
 from .services.zerodceEnhancement import enhance_image_zerodce
 from .services.retinexformerEnhancement import enhance_image_retinexformer
+from .utils.exdarkUtils import compute_precision, scaleBackDetections
 
 app = Flask(__name__)
 CORS(app)  # Enable Cross-Origin Resource Sharing (CORS)
@@ -22,6 +23,10 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 print(f"UPLOAD_FOLDER path: {os.path.abspath(UPLOAD_FOLDER)}")
 
+#to maintain mappings btwn unique file names and original file names
+nameMapping = {}
+sizeMapping = {}
+
 @app.route('/upload', methods=['POST'])
 def upload():
     if 'image' not in request.files:
@@ -29,17 +34,22 @@ def upload():
     file = request.files['image']
 
     if file and file.filename != '':
+        print("file received: ", file.filename)
         ext = os.path.splitext(file.filename)[1]
         uniqueFileName = f"{uuid.uuid4()}{ext}"
         
         save_path = os.path.join(app.config['UPLOAD_FOLDER'], uniqueFileName).replace('\\', '/')
 
         image = Image.open(file)
+        sizeMapping[uniqueFileName] = image.size
         image = image.resize((400, 300))
         image.save(save_path)
+
+        orig_name = file.filename.split("/")[-1]
+        nameMapping[uniqueFileName] = orig_name
         
         file_url = f"http://localhost:5000/uploads/{uniqueFileName}"
-        print("file saved to url: ", file_url)
+        # print("file saved to url: ", file_url)
         return jsonify({'filePath': file_url}), 200
     else:
         return jsonify({'error': 'No image file provided'}), 400
@@ -65,8 +75,8 @@ def detect():
     if img is None:
         return jsonify({'error': 'Failed to decode image'}), 400
     
-    model = YOLO(r"C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/uno.pt")
-    # model = YOLO(r"C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/yolov8s.pt")
+    # model = YOLO(r"C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/uno.pt")
+    model = YOLO(r"C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/yolov8s.pt")
     # Perform inference
     results = model(img)
 
@@ -303,6 +313,70 @@ def calculate_improvement(spatial_threshold = 0.7, size_threshold = 0.7):
         change['change'] = float(round(change['change'], 2))
         change['spatial_similarity'] = float(np.round(change['spatial_similarity'], 2))
     return jsonify(results)
+
+#endpoint for calculating mAP
+@app.route('/calculatemAP', methods=['POST', 'OPTIONS'])
+def calculateMAP():
+    if request.method == 'OPTIONS':
+        print("Preflight OPTIONS request received.")
+        return '', 200
+    data = request.get_json()
+
+    if not data or 'uploadedDetections' not in data or 'brightenedDetections' not in data or 'uploadedImagePath' not in data:
+        return jsonify({'error': 'Missing required data'}), 400
+    
+    uploadedImagePath = data['uploadedImagePath']
+    uploaded_detections = data['uploadedDetections']
+    brightened_detections = data['brightenedDetections']
+
+    print("uploaded detections path: ", uploadedImagePath)
+
+    def convert_to_detection(detection):
+        return [Detection(**d) for d in detection]
+    
+    original_w, original_h = sizeMapping[uploadedImagePath.split('/')[-1]]
+    scale_x = original_w / 400
+    scale_y = original_h / 300
+    
+    uploaded_detections = scaleBackDetections(uploaded_detections, scale_x, scale_y)
+    brightened_detections = scaleBackDetections(brightened_detections, scale_x, scale_y)
+
+    orig_dets = convert_to_detection(uploaded_detections)
+    bright_dets = convert_to_detection(brightened_detections)
+
+    uniqueName = uploadedImagePath.split('/')[-1]
+    print("unique name: ", uniqueName)
+
+    orignalName = nameMapping[uniqueName]
+    print("original name: ", orignalName)
+
+    groundTruth = []
+    #change location of ground truth file here!
+    grountTruthFolder = "C://Users//wenji//OneDrive//Desktop//Y3S2//ATAP//sample images//ExDark//temp random_annotations"
+    with open(f"{grountTruthFolder}//{orignalName}.txt", 'r') as file:
+        for line in file:
+            parts = line.strip().split(' ')
+            if len(parts) < 5:
+                continue
+            class_name = parts[0]
+            x, y, w, h = map(float, parts[1:5])
+            groundTruth.append({
+                'label': class_name,
+                'x': x,
+                'y': y,
+                'width': w,
+                'height': h
+            })
+    print("ground truth: ", groundTruth)
+    
+    #calculate mAP and convert to python float
+    map_orig = float(compute_precision(groundTruth, orig_dets))
+    map_bright = float(compute_precision(groundTruth, bright_dets))
+
+    return jsonify({
+        'precision_original': map_orig,
+        'precision_brightened': map_bright
+    })
 
     
 if __name__ == '__main__':

@@ -33,6 +33,10 @@ interface ImprovementResult {
     label_changes: number;
   };
 }
+interface mapImprovement {
+  precision_original: number;
+  precision_brightened: number;
+}
 
 @Component({
   selector: 'app-image-table',
@@ -205,5 +209,106 @@ export class ImageTableComponent {
     const scales = this.getImageScale(imagePath, image.target);
     this.scaleX = scales.scaleX;
     this.scaleY = scales.scaleY;
-  }  
+  }
+
+  calculateMAP(uploadedImage: any): Observable<mapImprovement> {
+    const uploadedDetections = uploadedImage.detectionResults || [];
+
+    // Wait for brightened detections
+    const brightenedDetections = this.getBrightenedDetections(uploadedImage.path);
+    const brightenedDetectionsList = Array.isArray(brightenedDetections) ? brightenedDetections : [];
+
+    const requestBody = {
+      uploadedImagePath: uploadedImage.path,
+      uploadedDetections,
+      brightenedDetections: brightenedDetectionsList
+    };
+
+    console.log("Sending request to calculate MAP", requestBody);
+
+    return this.http.post<mapImprovement>(
+      `${this.backendUrl}/calculatemAP`,
+      requestBody
+    ).pipe(
+      catchError(error => {
+        console.error("error during MAP calculation", error);
+        return of({ precision_original: 0, precision_brightened: 0 });
+      })
+    );
+  }
+  mapImprovementMAP: Map<string, mapImprovement> = new Map<string, mapImprovement>(); // Store direct results
+  
+  getMAPImprovementForImage(image: {path: string, detectionResults: any[]}) {
+    if (this.mapImprovementMAP.has(image.path)) {
+      return this.mapImprovementMAP.get(image.path);
+    }
+
+    if (this.loadingStates[image.path]) {
+      return undefined;
+    }
+    if (!image.detectionResults || !this.getBrightenedDetections(image.path)?.length) {
+      console.log("Detections not ready yet, skipping MAP calculation.");
+      this.retryMapCalculation(image);
+      return undefined;
+    }
+    this.loadingStates[image.path] = true;
+    this.calculateMAP(image).subscribe((mapResult) => {
+      this.mapImprovementMAP.set(image.path, mapResult);
+      this.loadingStates[image.path] = false;
+      console.log("MAP improvement for this image is obtained", mapResult);
+      this.calculateAggregatedMAPImprovement(mapResult);
+    });
+    return undefined;
+  }
+
+  retryMapCalculation(image: {path: string, detectionResults: any[]}) {
+    if (this.loadingStates[image.path]) return;
+
+    this.loadingStates[image.path] = true;
+    let attempts = 0;
+    const maxAttempts = 4;
+
+    const retryInterval = setInterval(() => {
+      attempts ++;
+      if ((image.detectionResults && this.getBrightenedDetections(image.path)?.length) || (attempts >= maxAttempts)) {
+        clearInterval(retryInterval);
+
+        console.log("detections are now ready, calculating MAP...");
+        this.calculateMAP(image).subscribe((mapResult) => {
+          this.mapImprovementMAP.set(image.path, mapResult);
+          this.loadingStates[image.path] = false;
+          console.log("MAP improvement for this image is obtained", mapResult);
+          this.calculateAggregatedMAPImprovement(mapResult);
+        });
+        this.getMAPImprovementForImage(image);
+      }
+    }, 5000)
+  }
+
+  aggregatedMapStats = {
+    totalImages: 0,
+    totalPrecisionImprovement: 0,
+    totalPrecisionDegradation: 0,
+    totalPrecisionOriginal: 0,
+    totalPrecisionBrightened: 0,
+    averageOriginalMAP: 0,
+    averageBrightenedMAP: 0
+  }
+
+  calculateAggregatedMAPImprovement(mapResult: mapImprovement) {
+    this.aggregatedMapStats.totalImages += 1;
+
+    this.aggregatedMapStats.totalPrecisionOriginal += mapResult.precision_original;
+    this.aggregatedMapStats.totalPrecisionBrightened += mapResult.precision_brightened;
+
+    if (mapResult.precision_brightened > mapResult.precision_original) {
+      this.aggregatedMapStats.totalPrecisionImprovement += 1;
+    } else if (mapResult.precision_brightened < mapResult.precision_original) {
+      this.aggregatedMapStats.totalPrecisionDegradation += 1;
+    }
+    if (this.aggregatedMapStats.totalImages > 0) {
+      this.aggregatedMapStats.averageOriginalMAP = this.aggregatedMapStats.totalPrecisionOriginal / this.aggregatedMapStats.totalImages;
+      this.aggregatedMapStats.averageBrightenedMAP = this.aggregatedMapStats.totalPrecisionBrightened / this.aggregatedMapStats.totalImages;
+    }
+  }
 }

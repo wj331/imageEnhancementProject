@@ -74,6 +74,7 @@ export class ImageUploadComponent{
     processImage(file: File) {
       const formData = new FormData();
       formData.append('image', file);
+      formData.append('image', file.name); // store original name
         
       // Step-by-step processing pipeline
       return this.http.post<{ filePath: string }>(`${this.backendUrl}upload`, formData).pipe(
