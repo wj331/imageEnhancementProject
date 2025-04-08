@@ -10,10 +10,11 @@ import glob
 import os
 import functools
 
-
+#find data, load it, transform it and package it into tensors
 class Dataset_SDSDImage(data.Dataset):
     def __init__(self, opt):
         super(Dataset_SDSDImage, self).__init__()
+        #dictionary containing dataset configurations
         self.opt = opt
         self.cache_data = opt['cache_data']
         self.half_N_frames = opt['N_frames'] // 2
@@ -34,6 +35,7 @@ class Dataset_SDSDImage(data.Dataset):
             testing_dir = []
         print('testing_dir', testing_dir)
 
+        #sequence of frames for one video clip
         subfolders_LQ = util.glob_file_list(self.LQ_root)
         subfolders_GT = util.glob_file_list(self.GT_root)
 
@@ -50,13 +52,14 @@ class Dataset_SDSDImage(data.Dataset):
             else:  # val test
                 if not(subfolder_name in testing_dir) and not(subfolder_name.split('_2')[0] in testing_dir):
                     continue
-
+            #collect image paths from within each subfolder and builds
             img_paths_LQ = util.glob_file_list(subfolder_LQ)
             img_paths_GT = util.glob_file_list(subfolder_GT)
 
             max_idx = len(img_paths_LQ)
             assert max_idx == len(
                 img_paths_GT), 'Different number of images in LQ and GT folders'
+            #ensures paired Low Quality and Ground Truth images have same length
             self.data_info['path_LQ'].extend(
                 img_paths_LQ)  # list of path str of images
             self.data_info['path_GT'].extend(img_paths_GT)
@@ -71,6 +74,7 @@ class Dataset_SDSDImage(data.Dataset):
                 border_l[max_idx - i - 1] = 1
             self.data_info['border'].extend(border_l)
 
+            #save paths for quick access if cache_data is enabled
             if self.cache_data:
                 self.imgs_LQ[subfolder_name] = img_paths_LQ
                 self.imgs_GT[subfolder_name] = img_paths_GT
@@ -84,11 +88,13 @@ class Dataset_SDSDImage(data.Dataset):
         img_LQ_path = self.imgs_LQ[folder][idx:idx + 1]
         img_GT_path = self.imgs_GT[folder][idx:idx + 1]
 
+        #gets image path and loads it using util.read_img_seq2
         img_LQ = util.read_img_seq2(img_LQ_path, self.opt['train_size'])
         img_LQ = img_LQ[0]
         img_GT = util.read_img_seq2(img_GT_path, self.opt['train_size'])
         img_GT = img_GT[0]
 
+        #data augmentation for training
         if self.opt['phase'] == 'train':
 
             # LQ_size = self.opt['LQ_size']

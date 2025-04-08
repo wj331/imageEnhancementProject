@@ -18,13 +18,13 @@ def enhance_image_retinexformer(img_np):
     img_tensor = img_tensor.to(device).unsqueeze(0)
 
     #load the retinexformer
-    opt = parse("C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/services/retinexOptions/RetinexFormer_LOL_v2_real.yml", is_train= False)
+    opt = parse("C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/services/retinexOptions/RetinexFormer_SDSD_indoor.yml", is_train= False)
     opt['dist'] = False
 
     model_restoration = create_model(opt).net_g
 
     # Load pre-trained weights
-    checkpoint = torch.load("C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/services/retinexPretrainedWeights/LOL_v2_real.pth", map_location="cpu")
+    checkpoint = torch.load("C:/Users/wenji/OneDrive/Desktop/Y3S2/ATAP/Image Enhancement Project/image-enhancement-app/backend/services/retinexPretrainedWeights/SDSD_indoor.pth", map_location="cpu")
     model_restoration.load_state_dict(checkpoint['params'], strict=True)
 
     # Set model to evaluation mode

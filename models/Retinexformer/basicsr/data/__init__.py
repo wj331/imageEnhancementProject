@@ -30,6 +30,7 @@ _dataset_modules = [
 
 # stx()
 def create_dataset(dataset_opt):
+    #creates a dataset object based on a configuration dictionary (dataset_opt)
     """Create dataset.
 
     Args:
@@ -37,16 +38,19 @@ def create_dataset(dataset_opt):
             name (str): Dataset name.
             type (str): Dataset type.
     """
+    #class name of dataset to be instantiated
     dataset_type = dataset_opt['type']
 
     # dynamic instantiation  如何理解动态实例化？逐个遍历已经import进来的包，就是所有dataset.py 
     for module in _dataset_modules:
+        #look inside each module for class with name dataset_type
         dataset_cls = getattr(module, dataset_type, None)  #getattr() 获取对象的属性值
         if dataset_cls is not None:
             break
     if dataset_cls is None:
         raise ValueError(f'Dataset {dataset_type} is not found.')
 
+    #instantiate dataset class with config dict and return
     dataset = dataset_cls(dataset_opt)
 
     logger = get_root_logger()

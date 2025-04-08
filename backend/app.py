@@ -137,7 +137,7 @@ def brighten():
     # # # Enhance the image using CLAHE
     # enhanced_img = enhance_image(img)
 
-    #Enhance the image using Zero-DCE
+    # #Enhance the image using Zero-DCE
     # enhanced_img = enhance_image_zerodce(img)
     
     #Enhance the image using RetinexFormer

@@ -25,6 +25,7 @@ import numpy as np
 
 from pdb import set_trace as stx
 
+#reads the YAML config using parse and returns opt (dictionary of configs)
 def parse_options(is_train=True):
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -61,7 +62,7 @@ def parse_options(is_train=True):
 
     return opt
 
-
+#initialize logging, such as logging environment info, config settings & metric CSV headers
 def init_loggers(opt):
     log_file = osp.join(opt['path']['log'],
                         f"train_{opt['name']}_{get_time_str()}.log")
@@ -100,6 +101,7 @@ def create_train_val_dataloader(opt, logger):  #train loader 和 val loader 一�
         # stx()
         if phase == 'train':
             dataset_enlarge_ratio = dataset_opt.get('dataset_enlarge_ratio', 1)
+            #builds a pytorch dataset (eg SDSDImage)
             train_set = create_dataset(dataset_opt)                                 #将option中的dataset参数传入create_dataset中构建train_set
             # stx()
             train_sampler = EnlargedSampler(train_set, opt['world_size'],
@@ -177,7 +179,7 @@ def main():
     else:
         resume_state = None
 
-    # mkdir for experiments and logger
+    # mkdir for experiments and logger especially since this is a fresh training run
     if resume_state is None:
         make_exp_dirs(opt)
         if opt['logger'].get('use_tb_logger') and 'debug' not in opt[
@@ -206,6 +208,7 @@ def main():
         best_iter = best_metric['iter']
         logger.info(f'best psnr: {best_psnr} from iteration {best_iter}')
     else:
+        #train from scratch
         model = create_model(opt)
         start_epoch = 0
         current_iter = 0
@@ -217,7 +220,7 @@ def main():
     # create message logger (formatted outputs)
     msg_logger = MessageLogger(opt, current_iter, tb_logger)
 
-    # dataloader prefetcher
+    # dataloader prefetcher used to preload data efficiently
     prefetch_mode = opt['datasets']['train'].get('prefetch_mode')
     if prefetch_mode is None or prefetch_mode == 'cpu':
         prefetcher = CPUPrefetcher(train_loader)
@@ -230,7 +233,6 @@ def main():
         raise ValueError(f'Wrong prefetch_mode {prefetch_mode}.'
                          "Supported ones are: None, 'cuda', 'cpu'.")
 
-    # training
     logger.info(
         f'Start training from epoch: {start_epoch}, iter: {current_iter}')
     data_time, iter_time = time.time(), time.time()
@@ -238,6 +240,7 @@ def main():
 
     # for epoch in range(start_epoch, total_epochs + 1):
 
+    #for progressive learning so that we can change the patch size and batch size gradually
     iters = opt['datasets']['train'].get('iters')
     batch_size = opt['datasets']['train'].get('batch_size_per_gpu')
     mini_batch_sizes = opt['datasets']['train'].get('mini_batch_sizes')
@@ -252,6 +255,7 @@ def main():
 
     epoch = start_epoch
 
+    #training loop begins
     while current_iter <= total_iters:
         train_sampler.set_epoch(epoch)
         prefetcher.reset()
@@ -268,6 +272,8 @@ def main():
                 current_iter, warmup_iter=opt['train'].get('warmup_iter', -1))
 
             # ------Progressive learning ---------------------
+
+            #finds which group we are in based on current_iter
             j = ((current_iter > groups) != True).nonzero()[
                 0]  # 根据当前的iter次数判断在哪个阶段
             if len(j) == 0:
@@ -275,6 +281,8 @@ def main():
             else:
                 bs_j = j[0]
 
+            #gradually change patch_size and batch_size
+            #progressive learning: for first 1000 iterations, use patch size 64 and batch size 4, then patchsize 128 and batch size 8, then patch size 256 and batch size 16
             mini_gt_size = mini_gt_sizes[bs_j]
             mini_batch_size = mini_batch_sizes[bs_j]
 
@@ -292,6 +300,7 @@ def main():
                 lq = lq[indices]
                 gt = gt[indices]
 
+            #if needed, randomly samples smaller batches and crops smaller patches
             if mini_gt_size < gt_size:
                 x0 = int((gt_size - mini_gt_size) * random.random())
                 y0 = int((gt_size - mini_gt_size) * random.random())
@@ -301,6 +310,8 @@ def main():
                 gt = gt[:, :, x0 * scale:x1 * scale, y0 * scale:y1 * scale]
             # -------------------------------------------
             # print(lq.shape)
+
+            #feed data and optimize: forward + loss + backward + optimizer step
             model.feed_train_data({'lq': lq, 'gt': gt})
             model.optimize_parameters(current_iter)
 
@@ -313,12 +324,12 @@ def main():
                 log_vars.update(model.get_current_log())
                 msg_logger(log_vars)
 
-            # save models and training states
+            # save models and training states every checkpoint_freq iterations
             if current_iter % opt['logger']['save_checkpoint_freq'] == 0:
                 logger.info('Saving models and training states.')
                 model.save(epoch, current_iter, best_metric=best_metric)
 
-            # validation
+            # runs validation every val_freq iterations
             if opt.get('val') is not None and (current_iter %
                                                opt['val']['val_freq'] == 0):
                 rgb2bgr = opt['val'].get('rgb2bgr', True)
@@ -331,7 +342,7 @@ def main():
                 metric_str = f'{current_iter},{current_metric}'
                 logger_metric.info(metric_str)
 
-                # log best metric
+                # log best metric model
                 if best_metric['psnr'] < current_metric:
                     best_metric['psnr'] = current_metric
                     # save best model

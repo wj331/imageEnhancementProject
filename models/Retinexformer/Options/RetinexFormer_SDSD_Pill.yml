@@ -1,0 +1,135 @@
+# general settings
+name: Enhancement_RetinexFormer_SDSD_indoor
+model_type: ImageCleanModel
+scale: 1
+num_gpu: 1  # set num_gpu: 0 for cpu mode
+manual_seed: 100
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: TrainPills
+    type: Dataset_PillImage
+    dataroot_gt: data/pills/train/GT
+    dataroot_lq: data/pills/train/LQ
+    train_size: [256, 256]
+    cache_data: true
+    padding: ~
+    testing_dir: ~
+    filename_tmpl: '{}'
+    io_backend:
+      type: disk
+
+    N_frames: 1     #single-frame images
+    # data argument
+    use_flip: true
+    use_rot: true
+    color: RGB
+    
+    # data loader
+    use_shuffle: true
+    num_worker_per_gpu: 2
+    batch_size_per_gpu: 2
+
+    ### -------------Progressive training--------------------------
+    # mini_batch_sizes: [8,5,4,2,1,1]             # Batch size per gpu   
+    # iters: [92000,64000,48000,36000,36000,24000]
+    # gt_size: 384   # Max patch size for progressive training
+    # gt_sizes: [128,160,192,256,320,384]  # Patch sizes for progressive training.
+    ### ------------------------------------------------------------
+
+    #fine-tuning setup: fixed patch size
+    mini_batch_sizes: [2]   
+    iters: [2000]
+    gt_size: 128   # gt_size > gt_sizes[0]表示crop gt_sizes[0]的图片
+    gt_sizes: [128]
+    ### ------------------------------------------------------------
+
+    dataset_enlarge_ratio: 1
+    prefetch_mode: cuda
+    pin_memory: true
+
+  val:
+    name: ValPills
+    type: Dataset_PillImage
+    dataroot_gt: data/pills/val/GT
+    dataroot_lq: data/pills/val/LQ
+    cache_data: true
+    N_frames: 1
+    padding: ~
+    train_size: [256, 256]
+    testing_dir: ~
+    io_backend:
+      type: disk
+
+# network structures
+network_g:
+  type: RetinexFormer
+  in_channels: 3
+  out_channels: 3
+  n_feat: 40
+  stage: 1
+  num_blocks: [1,2,2]
+
+
+# path
+path:
+  pretrain_network_g: backend/services/retinexPretrainedWeights/SDSD_indoor.pth
+  strict_load_g: true
+  resume_state: ~
+
+# training settings
+train:
+  total_iter: 2000
+  warmup_iter: -1 # no warm up
+  use_grad_clip: true
+
+  # Split 300k iterations into two cycles. 
+  # 1st cycle: fixed 3e-4 LR for 92k iters. 
+  # 2nd cycle: cosine annealing (3e-4 to 1e-6) for 208k iters.
+  scheduler:
+    type: CosineAnnealingRestartCyclicLR
+    periods: [2000]       
+    restart_weights: [1]
+    eta_mins: [0.000001]   
+
+  optim_g:
+    type: Adam
+    lr: !!float 2e-4
+    # weight_decay: !!float 1e-4
+    betas: [0.9, 0.999]
+  
+  # losses
+  pixel_opt:
+    type: L1Loss
+    loss_weight: 1
+    reduction: mean
+
+# validation settings
+val:
+  window_size: 4
+  val_freq: 500
+  save_img: true
+  rgb2bgr: true
+  use_image: false
+  max_minibatch: 4
+
+  metrics:
+    psnr: # metric name, can be arbitrary
+      type: calculate_psnr
+      crop_border: 0
+      test_y_channel: false
+
+# logging settings
+logger:
+  print_freq: 100
+  save_checkpoint_freq: 500
+  use_tb_logger: true
+  wandb:
+    project: low_light_pills
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500
